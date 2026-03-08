@@ -715,7 +715,12 @@ describe("MonthlyExpensesPage", () => {
     expect(
       screen.getByLabelText("Cantidad total de cuotas"),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("Fin de la deuda")).toBeInTheDocument();
+    expect(screen.getByLabelText("Fin de la deuda")).toHaveAttribute(
+      "readonly",
+    );
+    expect(
+      screen.getByText("Completá inicio y cuotas para ver el avance."),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByLabelText("Es deuda/préstamo"));
 
@@ -1256,7 +1261,13 @@ describe("MonthlyExpensesPage", () => {
     await user.click(screen.getByRole("button", { name: "Seleccioná un prestador" }));
     await user.click(screen.getByRole("button", { name: "Papa Familiar" }));
     await user.type(screen.getByLabelText("Cantidad total de cuotas"), "12");
-    await user.type(screen.getByLabelText("Inicio de la deuda"), "2026-01");
+    await user.click(screen.getByLabelText("Inicio de la deuda"));
+    const [monthSelect, yearSelect] = screen
+      .getAllByRole("combobox")
+      .filter((element) => element.tagName === "SELECT");
+    await user.selectOptions(monthSelect, "0");
+    await user.selectOptions(yearSelect, "2026");
+    await user.click(screen.getByRole("button", { name: /Usar enero de 2026/i }));
     await user.click(screen.getByRole("button", { name: "Guardar" }));
 
     await waitFor(() => {

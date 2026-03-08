@@ -104,6 +104,67 @@
   color: var(--destructive);
 }
 
+.readOnlyField {
+  color: var(--muted-foreground);
+  background: color-mix(in srgb, var(--muted) 70%, transparent);
+  border-color: color-mix(in srgb, var(--border) 90%, transparent);
+  box-shadow: none;
+  cursor: default;
+}
+
+.readOnlyField:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.readOnlyField::placeholder {
+  color: var(--muted-foreground);
+}
+
+.datePickerTrigger {
+  width: 100%;
+  justify-content: space-between;
+  font-weight: 400;
+}
+
+.datePickerPlaceholder {
+  color: var(--muted-foreground);
+}
+
+.datePickerValue {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.datePickerIcon {
+  color: var(--muted-foreground);
+}
+
+.datePickerPopover {
+  width: min(20rem, calc(100vw - 2rem));
+  padding: 0.9rem;
+}
+
+.datePickerSelectors {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.datePickerSelectGroup {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.datePickerActions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 0.85rem;
+}
+
+.datePickerConfirmButton {
+  width: 100%;
+}
+
 .loanSection {
   display: grid;
   gap: 0.9rem;
@@ -138,10 +199,19 @@
 }
 
 .loanStatus {
-  margin: 0;
+  border: 1px solid color-mix(in srgb, #60a5fa 35%, transparent);
+  background: color-mix(in srgb, #60a5fa 12%, transparent);
+  color: #1d4ed8;
+}
+
+.loanStatusIcon {
+  color: inherit;
+}
+
+.loanStatusText {
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--foreground);
+  color: inherit;
 }
 
 .footer {

@@ -1,7 +1,11 @@
-import { useEffect, useMemo } from "react";
-import { X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { CalendarIcon, Info, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 
+import {
+  Alert,
+  AlertDescription,
+} from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,6 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Form,
   FormControl,
@@ -28,6 +33,11 @@ import {
   InputGroupPrefix,
 } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -171,6 +181,32 @@ function getExpenseSheetFormValues(
   };
 }
 
+function parseMonthIdentifier(value: string): Date | undefined {
+  const monthMatch = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(value.trim());
+
+  if (!monthMatch) {
+    return undefined;
+  }
+
+  const [, year, month] = monthMatch;
+
+  return new Date(Number(year), Number(month) - 1, 1);
+}
+
+function formatMonthIdentifier(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+
+  return `${year}-${month}`;
+}
+
+function formatMonthDisplay(date: Date): string {
+  return new Intl.DateTimeFormat("es-AR", {
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
+
 function getFieldErrors(draft: MonthlyExpensesEditableRow): ExpenseFieldErrorMap {
   const fieldErrors: ExpenseFieldErrorMap = {};
   const subtotal = Number(draft.subtotal);
@@ -231,6 +267,10 @@ export function ExpenseSheet({
     "Marcá el check si este gasto representa una deuda con una persona o entidad.";
   const hasPendingChanges = changedFields.size > 0;
   const currencyPrefix = draft.currency === "USD" ? "US$" : "$";
+  const selectedStartMonthDate = useMemo(
+    () => parseMonthIdentifier(draft.startMonth),
+    [draft.startMonth],
+  );
   const form = useForm<ExpenseSheetFormValues>({
     values: getExpenseSheetFormValues(draft),
   });
@@ -238,6 +278,10 @@ export function ExpenseSheet({
   const hasFieldErrors = Object.keys(fieldErrors).length > 0;
   const shouldShowGlobalValidation =
     Boolean(validationMessage) && !hasFieldErrors;
+  const [isStartMonthPickerOpen, setIsStartMonthPickerOpen] = useState(false);
+  const [startMonthCalendarMonth, setStartMonthCalendarMonth] = useState<Date>(
+    selectedStartMonthDate ?? new Date(),
+  );
 
   useEffect(() => {
     form.clearErrors();
@@ -251,6 +295,10 @@ export function ExpenseSheet({
       },
     );
   }, [fieldErrors, form]);
+
+  useEffect(() => {
+    setStartMonthCalendarMonth(selectedStartMonthDate ?? new Date());
+  }, [selectedStartMonthDate]);
 
   return (
     <>
@@ -535,26 +583,95 @@ export function ExpenseSheet({
                               )}
                             </FormLabel>
                             <div className={styles.fieldControlWrapper}>
-                              <FormControl>
-                                <Input
-                                  aria-label="Inicio de la deuda"
-                                  className={cn(
-                                    fieldErrors.startMonth && styles.invalidField,
-                                    changedFields.has("startMonth") &&
-                                      styles.changedField,
-                                  )}
-                                  data-changed={
-                                    changedFields.has("startMonth")
-                                      ? "true"
-                                      : "false"
+                              <Popover
+                                onOpenChange={(nextOpen) => {
+                                  setIsStartMonthPickerOpen(nextOpen);
+
+                                  if (nextOpen) {
+                                    setStartMonthCalendarMonth(
+                                      selectedStartMonthDate ?? new Date(),
+                                    );
                                   }
-                                  onChange={(event) =>
-                                    onFieldChange("startMonth", event.target.value)
-                                  }
-                                  type="month"
-                                  value={draft.startMonth}
-                                />
-                              </FormControl>
+                                }}
+                                open={isStartMonthPickerOpen}
+                              >
+                                <PopoverTrigger asChild>
+                                  <FormControl>
+                                    <Button
+                                      aria-label="Inicio de la deuda"
+                                      className={cn(
+                                        styles.datePickerTrigger,
+                                        !selectedStartMonthDate &&
+                                          styles.datePickerPlaceholder,
+                                        fieldErrors.startMonth && styles.invalidField,
+                                        changedFields.has("startMonth") &&
+                                          styles.changedField,
+                                      )}
+                                      data-changed={
+                                        changedFields.has("startMonth")
+                                          ? "true"
+                                          : "false"
+                                      }
+                                      type="button"
+                                      variant="outline"
+                                    >
+                                      <span className={styles.datePickerValue}>
+                                        {selectedStartMonthDate
+                                          ? formatMonthDisplay(selectedStartMonthDate)
+                                          : "Seleccioná una fecha"}
+                                      </span>
+                                      <CalendarIcon
+                                        aria-hidden="true"
+                                        className={styles.datePickerIcon}
+                                      />
+                                    </Button>
+                                  </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                  align="start"
+                                  className={styles.datePickerPopover}
+                                >
+                                  <Calendar
+                                    buttonVariant="outline"
+                                    captionLayout="dropdown"
+                                    classNames={{
+                                      table: "hidden",
+                                      weekdays: "hidden",
+                                      week: "hidden",
+                                    }}
+                                    formatters={{
+                                      formatMonthDropdown: (date) =>
+                                        new Intl.DateTimeFormat("es-AR", {
+                                          month: "long",
+                                        }).format(date),
+                                    }}
+                                    mode="single"
+                                    month={startMonthCalendarMonth}
+                                    onMonthChange={setStartMonthCalendarMonth}
+                                    selected={selectedStartMonthDate}
+                                    showOutsideDays={false}
+                                    startMonth={new Date(2020, 0, 1)}
+                                    endMonth={new Date(2040, 11, 1)}
+                                  />
+                                  <div className={styles.datePickerActions}>
+                                    <Button
+                                      className={styles.datePickerConfirmButton}
+                                      onClick={() => {
+                                        onFieldChange(
+                                          "startMonth",
+                                          formatMonthIdentifier(
+                                            startMonthCalendarMonth,
+                                          ),
+                                        );
+                                        setIsStartMonthPickerOpen(false);
+                                      }}
+                                      type="button"
+                                    >
+                                      Usar {formatMonthDisplay(startMonthCalendarMonth)}
+                                    </Button>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
                               <FormMessage className={styles.fieldErrorText} />
                             </div>
                           </FormItem>
@@ -610,18 +727,25 @@ export function ExpenseSheet({
                         <Label htmlFor="expense-loan-end-month">Fin de la deuda</Label>
                         <Input
                           aria-label="Fin de la deuda"
+                          className={styles.readOnlyField}
                           id="expense-loan-end-month"
                           readOnly
+                          tabIndex={-1}
                           type="month"
                           value={draft.loanEndMonth}
                         />
                       </div>
                     </div>
 
-                    <p className={styles.loanStatus} role="status">
-                      {draft.loanProgress ||
-                        "Completá inicio y cuotas para ver el avance."}
-                    </p>
+                    <Alert className={styles.loanStatus}>
+                      <Info aria-hidden="true" className={styles.loanStatusIcon} />
+                      <AlertDescription className={styles.loanStatusText}>
+                        <p>
+                          {draft.loanProgress ||
+                            "Completá inicio y cuotas para ver el avance."}
+                        </p>
+                      </AlertDescription>
+                    </Alert>
                   </>
                 ) : null}
               </div>
