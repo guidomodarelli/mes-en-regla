@@ -142,23 +142,13 @@
 
 .datePickerPopover {
   width: min(20rem, calc(100vw - 2rem));
-  padding: 0.9rem;
-}
-
-.datePickerSelectors {
-  display: grid;
-  gap: 0.85rem;
-}
-
-.datePickerSelectGroup {
-  display: grid;
-  gap: 0.4rem;
+  padding: 0.75rem;
 }
 
 .datePickerActions {
   display: flex;
   justify-content: flex-end;
-  padding-top: 0.85rem;
+  padding-top: 0.4rem;
 }
 
 .datePickerConfirmButton {

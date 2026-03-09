@@ -635,6 +635,10 @@ export function ExpenseSheet({
                                     buttonVariant="outline"
                                     captionLayout="dropdown"
                                     classNames={{
+                                      month: "gap-1",
+                                      months: "gap-0",
+                                      nav: "hidden",
+                                      month_caption: "h-auto px-0",
                                       table: "hidden",
                                       weekdays: "hidden",
                                       week: "hidden",
