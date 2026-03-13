@@ -338,7 +338,7 @@ describe("MonthlyExpensesPage", () => {
 
     await user.type(screen.getByLabelText("Descripción"), "Internet");
     await user.type(screen.getByLabelText("Subtotal"), "15000");
-    await user.type(screen.getByLabelText("Cantidad de veces por mes"), "1");
+    await user.type(screen.getByLabelText("Veces al mes"), "1");
 
     expect(screen.getByLabelText("Subtotal")).toHaveValue("15.000");
     expect(screen.getByLabelText("Total")).toHaveValue("15.000");
@@ -806,7 +806,7 @@ describe("MonthlyExpensesPage", () => {
       "aria-invalid",
       "true",
     );
-    expect(screen.getByLabelText("Cantidad de veces por mes")).toHaveAttribute(
+    expect(screen.getByLabelText("Veces al mes")).toHaveAttribute(
       "aria-invalid",
       "true",
     );

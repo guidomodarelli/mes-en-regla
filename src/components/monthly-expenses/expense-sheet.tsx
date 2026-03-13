@@ -488,14 +488,14 @@ function ExpenseSheetContent({
                     <FormItem className={styles.fieldGroup}>
                       <FormLabel>
                         {getFieldLabel(
-                          "Cantidad de veces por mes",
+                          "Veces al mes",
                           changedFields.has("occurrencesPerMonth"),
                         )}
                       </FormLabel>
                       <div className={styles.fieldControlWrapper}>
                         <FormControl>
                           <Input
-                            aria-label="Cantidad de veces por mes"
+                            aria-label="Veces al mes"
                             className={cn(
                               fieldErrors.occurrencesPerMonth && styles.invalidField,
                               changedFields.has("occurrencesPerMonth") &&

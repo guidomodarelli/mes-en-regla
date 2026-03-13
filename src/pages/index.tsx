@@ -346,7 +346,7 @@ function getExpenseValidationMessage(
     !Number.isInteger(occurrencesPerMonth) ||
     occurrencesPerMonth <= 0
   ) {
-    return "Completá descripción, subtotal y cantidad de veces por mes antes de guardar.";
+    return "Completá descripción, subtotal y veces al mes antes de guardar.";
   }
 
   const installmentCount = Number(row.installmentCount);

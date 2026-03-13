@@ -164,7 +164,7 @@ export function MonthlyExpensesTable({
       },
       {
         accessorKey: "occurrencesPerMonth",
-        header: getSortableHeader("Cantidad de veces por mes"),
+        header: getSortableHeader("Veces al mes"),
       },
       {
         accessorKey: "total",
