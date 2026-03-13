@@ -10,6 +10,7 @@ import * as schema from "./schema";
 
 export type TursoDatabase = LibSQLDatabase<typeof schema>;
 const migrationsFolder = path.resolve(process.cwd(), "drizzle");
+let pendingMigration: Promise<void> | null = null;
 
 export function createTursoDatabase(): TursoDatabase {
   const config = requireTursoServerConfig();
@@ -23,12 +24,22 @@ export function createTursoDatabase(): TursoDatabase {
   });
 }
 
+async function ensureMigrationsAreApplied(database: TursoDatabase) {
+  if (!pendingMigration) {
+    pendingMigration = migrate(database, {
+      migrationsFolder,
+    }).catch((error) => {
+      pendingMigration = null;
+      throw error;
+    });
+  }
+
+  await pendingMigration;
+}
+
 export async function createMigratedTursoDatabase(): Promise<TursoDatabase> {
   const database = createTursoDatabase();
-
-  await migrate(database, {
-    migrationsFolder,
-  });
+  await ensureMigrationsAreApplied(database);
 
   return database;
 }
