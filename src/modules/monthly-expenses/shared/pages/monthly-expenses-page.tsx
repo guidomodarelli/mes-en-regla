@@ -889,7 +889,6 @@ export default function MonthlyExpensesPage({
       originalRow: { ...row },
       showUnsavedChangesDialog: false,
     }));
-    toast.info("Editá el gasto y guardá los cambios cuando estés listo.");
   };
 
   const handleRequestCloseExpenseSheet = () => {
