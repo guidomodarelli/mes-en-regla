@@ -6,16 +6,6 @@ import {
   Alert,
   AlertDescription,
 } from "@/components/ui/alert";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -84,6 +74,7 @@ interface ExpenseSheetProps {
   onLoanToggle: (checked: boolean) => void;
   onRequestClose: () => void;
   onSave: () => void;
+  onUnsavedChangesClose: () => void;
   onUnsavedChangesDiscard: () => void;
   onUnsavedChangesSave: () => void;
   showUnsavedChangesDialog: boolean;
@@ -266,6 +257,7 @@ function ExpenseSheetContent({
   onLoanToggle,
   onRequestClose,
   onSave,
+  onUnsavedChangesClose,
   onUnsavedChangesDiscard,
   onUnsavedChangesSave,
   showUnsavedChangesDialog,
@@ -809,30 +801,55 @@ function ExpenseSheetContent({
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={showUnsavedChangesDialog}>
-        <AlertDialogContent className={styles.unsavedChangesContent}>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Cambios sin guardar</AlertDialogTitle>
-            <AlertDialogDescription>
+      <Dialog
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            onUnsavedChangesClose();
+          }
+        }}
+        open={showUnsavedChangesDialog}
+      >
+        <DialogContent
+          className={styles.unsavedChangesContent}
+          showCloseButton={false}
+        >
+          <DialogHeader className={styles.unsavedChangesHeader}>
+            <div className={styles.unsavedChangesHeaderTopRow}>
+              <DialogTitle>Cambios sin guardar</DialogTitle>
+              <Button
+                aria-label="Cerrar aviso de cambios sin guardar"
+                className={styles.unsavedChangesCloseButton}
+                onClick={onUnsavedChangesClose}
+                size="icon-sm"
+                type="button"
+                variant="ghost"
+              >
+                <X aria-hidden="true" />
+              </Button>
+            </div>
+            <DialogDescription>
               Tenés cambios sin guardar en este gasto.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className={styles.unsavedChangesFooter}>
-            <AlertDialogCancel
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className={styles.unsavedChangesFooter}>
+            <Button
               className={styles.unsavedChangesButton}
               onClick={onUnsavedChangesDiscard}
+              type="button"
+              variant="outline"
             >
               Descartar los cambios
-            </AlertDialogCancel>
-            <AlertDialogAction
+            </Button>
+            <Button
               className={styles.unsavedChangesButton}
               onClick={onUnsavedChangesSave}
+              type="button"
             >
               Guardar los cambios
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

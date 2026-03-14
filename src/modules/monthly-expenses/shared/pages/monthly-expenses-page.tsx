@@ -910,6 +910,13 @@ export default function MonthlyExpensesPage({
     toast.info("Se descartaron los cambios sin guardar.");
   };
 
+  const handleUnsavedChangesClose = () => {
+    updateExpenseSheetState((currentState) => ({
+      ...currentState,
+      showUnsavedChangesDialog: false,
+    }));
+  };
+
   const handleSaveExpense = async () => {
     if (!expenseSheetState.draft) {
       toast.warning("No hay un gasto abierto para guardar.");
@@ -1265,6 +1272,7 @@ export default function MonthlyExpensesPage({
                 onRequestCloseExpenseSheet={handleRequestCloseExpenseSheet}
                 onSaveExpense={handleSaveExpense}
                 onSaveUnsavedChanges={handleSaveUnsavedChanges}
+                onUnsavedChangesClose={handleUnsavedChangesClose}
                 onUnsavedChangesDiscard={handleUnsavedChangesDiscard}
                 rows={formState.rows}
                 sheetMode={expenseSheetState.mode}

@@ -1118,6 +1118,129 @@ describe("MonthlyExpensesPage", () => {
     expect(screen.queryByText("Agua descartada")).not.toBeInTheDocument();
   });
 
+  it("closes the unsaved changes warning on backdrop click and keeps editing", async () => {
+    const user = userEvent.setup();
+    const fetchMock = createMonthlyExpensesFetchMock();
+
+    mockedUseSession.mockReturnValue({
+      data: {
+        expires: "2099-01-01T00:00:00.000Z",
+        user: {
+          email: "gus@example.com",
+          name: "Gus",
+        },
+      },
+      status: "authenticated",
+      update: jest.fn(),
+    } as ReturnType<typeof useSession>);
+    global.fetch = fetchMock as typeof fetch;
+
+    renderWithProviders(
+      <MonthlyExpensesPage
+        {...basePageProps}
+        initialDocument={{
+          items: [
+            {
+              currency: "ARS",
+              description: "Agua",
+              id: "expense-1",
+              occurrencesPerMonth: 1,
+              subtotal: 10774.53,
+              total: 10774.53,
+            },
+          ],
+          month: "2026-03",
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Abrir acciones para Agua" }));
+    await user.click(screen.getByRole("menuitem", { name: "Editar" }));
+    await user.clear(screen.getByLabelText("Descripción"));
+    await user.type(screen.getByLabelText("Descripción"), "Agua pendiente");
+
+    const primaryOverlay = document.querySelector("[data-slot='dialog-overlay']");
+    expect(primaryOverlay).not.toBeNull();
+    await user.click(primaryOverlay as HTMLElement);
+
+    expect(
+      screen.getByText("Tenés cambios sin guardar en este gasto."),
+    ).toBeInTheDocument();
+
+    const overlays = document.querySelectorAll("[data-slot='dialog-overlay']");
+    await user.click(overlays.item(overlays.length - 1) as HTMLElement);
+
+    expect(
+      screen.queryByText("Tenés cambios sin guardar en este gasto."),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Editar gasto" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Descripción")).toHaveValue("Agua pendiente");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("closes the unsaved changes warning from the close button and keeps editing", async () => {
+    const user = userEvent.setup();
+    const fetchMock = createMonthlyExpensesFetchMock();
+
+    mockedUseSession.mockReturnValue({
+      data: {
+        expires: "2099-01-01T00:00:00.000Z",
+        user: {
+          email: "gus@example.com",
+          name: "Gus",
+        },
+      },
+      status: "authenticated",
+      update: jest.fn(),
+    } as ReturnType<typeof useSession>);
+    global.fetch = fetchMock as typeof fetch;
+
+    renderWithProviders(
+      <MonthlyExpensesPage
+        {...basePageProps}
+        initialDocument={{
+          items: [
+            {
+              currency: "ARS",
+              description: "Agua",
+              id: "expense-1",
+              occurrencesPerMonth: 1,
+              subtotal: 10774.53,
+              total: 10774.53,
+            },
+          ],
+          month: "2026-03",
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Abrir acciones para Agua" }));
+    await user.click(screen.getByRole("menuitem", { name: "Editar" }));
+    await user.clear(screen.getByLabelText("Descripción"));
+    await user.type(screen.getByLabelText("Descripción"), "Agua en progreso");
+
+    const primaryOverlay = document.querySelector("[data-slot='dialog-overlay']");
+    expect(primaryOverlay).not.toBeNull();
+    await user.click(primaryOverlay as HTMLElement);
+
+    expect(
+      screen.getByText("Tenés cambios sin guardar en este gasto."),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Cerrar aviso de cambios sin guardar",
+      }),
+    );
+
+    expect(
+      screen.queryByText("Tenés cambios sin guardar en este gasto."),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Editar gasto" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Descripción")).toHaveValue("Agua en progreso");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("shows validation inside the sheet and blocks save when an expense is incomplete", async () => {
     const user = userEvent.setup();
 

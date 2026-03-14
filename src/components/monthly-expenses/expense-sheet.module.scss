@@ -262,6 +262,22 @@
   width: min(30rem, calc(100vw - 2rem));
 }
 
+.unsavedChangesHeader {
+  gap: 0.4rem;
+}
+
+.unsavedChangesHeaderTopRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.unsavedChangesCloseButton {
+  flex-shrink: 0;
+}
+
 .unsavedChangesFooter {
   display: flex;
   flex-direction: column-reverse;

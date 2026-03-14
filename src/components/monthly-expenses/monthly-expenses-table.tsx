@@ -73,6 +73,7 @@ interface MonthlyExpensesTableProps {
   onRequestCloseExpenseSheet: () => void;
   onSaveExpense: () => void;
   onSaveUnsavedChanges: () => void;
+  onUnsavedChangesClose: () => void;
   onUnsavedChangesDiscard: () => void;
   rows: MonthlyExpensesEditableRow[];
   sheetMode: "create" | "edit";
@@ -160,6 +161,7 @@ export function MonthlyExpensesTable({
   onRequestCloseExpenseSheet,
   onSaveExpense,
   onSaveUnsavedChanges,
+  onUnsavedChangesClose,
   onUnsavedChangesDiscard,
   rows,
   sheetMode,
@@ -350,6 +352,7 @@ export function MonthlyExpensesTable({
           onLoanToggle={onExpenseLoanToggle}
           onRequestClose={onRequestCloseExpenseSheet}
           onSave={onSaveExpense}
+          onUnsavedChangesClose={onUnsavedChangesClose}
           onUnsavedChangesDiscard={onUnsavedChangesDiscard}
           onUnsavedChangesSave={onSaveUnsavedChanges}
           showUnsavedChangesDialog={showUnsavedChangesDialog}
