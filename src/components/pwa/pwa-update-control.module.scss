@@ -1,0 +1,23 @@
+.container {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--border) 84%, var(--primary) 16%);
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  color: color-mix(in srgb, var(--foreground) 78%, var(--primary) 22%);
+  background: color-mix(in srgb, var(--muted) 90%, var(--primary) 10%);
+}
+
+@media (max-width: 640px) {
+  .badge {
+    display: none;
+  }
+}

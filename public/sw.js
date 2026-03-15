@@ -16,6 +16,13 @@ self.addEventListener("install", (event) => {
       .then((cache) => cache.addAll(PRECACHE_URLS))
       .catch(() => undefined),
   );
+});
+
+self.addEventListener("message", (event) => {
+  if (!event.data || event.data.type !== "SKIP_WAITING") {
+    return;
+  }
+
   self.skipWaiting();
 });
 

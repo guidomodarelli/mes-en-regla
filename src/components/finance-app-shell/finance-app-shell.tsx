@@ -9,6 +9,7 @@ import {
 } from "@tabler/icons-react";
 
 import { GoogleAccountAvatar } from "@/components/auth/google-account-avatar";
+import { PwaUpdateControl } from "@/components/pwa/pwa-update-control";
 import { ThemeModeToggle } from "@/components/theme/theme-mode-toggle";
 import {
   Sidebar,
@@ -155,6 +156,7 @@ export function FinanceAppShell({
                 aria-label="Abrir menu lateral"
                 className={styles.mobileSidebarTrigger}
               />
+              <PwaUpdateControl />
               <ThemeModeToggle />
               <GoogleAccountAvatar
                 onConnect={handleGoogleAccountConnect}
