@@ -2657,6 +2657,9 @@ describe("MonthlyExpensesPage", () => {
     });
 
     expect(screen.getAllByText("Papa")[0]).toBeInTheDocument();
+    expect(
+      screen.queryByText("Prestador guardado correctamente."),
+    ).not.toBeInTheDocument();
   });
 
   it("discards unsaved lenders form changes from the modal", async () => {

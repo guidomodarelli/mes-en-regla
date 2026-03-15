@@ -656,16 +656,10 @@ export default function MonthlyExpensesPage({
     !showCopyFromControls ||
     !copySourceMonth ||
     copySourceMonthOptions.length === 0;
-  const lendersFeedbackMessage =
-    lendersState.error ??
-    lendersState.successMessage ??
-    lendersLoadError ??
-    null;
+  const lendersFeedbackMessage = lendersState.error ?? lendersLoadError ?? null;
   const lendersFeedbackTone = lendersState.error || lendersLoadError
     ? "error"
-    : lendersState.successMessage
-      ? "success"
-      : "default";
+    : "default";
 
   const updateFormState = (
     updater: (currentState: MonthlyExpensesFormState) => MonthlyExpensesFormState,
