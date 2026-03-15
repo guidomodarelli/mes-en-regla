@@ -167,11 +167,7 @@ export function PaymentFrequencyField({
             value={occurrencesPerMonth}
           />
         </div>
-      ) : (
-        <p className={styles.singleFrequencyHint}>
-          Se asume automáticamente 1 vez por mes.
-        </p>
-      )}
+      ) : null}
     </div>
   );
 }
