@@ -71,7 +71,7 @@ export function DataTable<TData, TValue>({
   showColumnVisibilityToggle = false,
   columnVisibilityButtonLabel = "Columnas",
   columnVisibilityMenuLabel = "Mostrar columnas",
-  resetSortingMenuItemLabel = "Quitar ordenamiento",
+  resetSortingMenuItemLabel = "Restablecer orden original",
   selectAllColumnsLabel = "Seleccionar todas",
   deselectAllColumnsLabel = "Deseleccionar todas",
 }: DataTableProps<TData, TValue>) {

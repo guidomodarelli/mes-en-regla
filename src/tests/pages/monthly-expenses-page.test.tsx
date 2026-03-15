@@ -537,7 +537,7 @@ describe("MonthlyExpensesPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Columnas" }));
     expect(
-      screen.queryByRole("menuitem", { name: /Quitar ordenamiento/i }),
+      screen.queryByRole("menuitem", { name: /Restablecer orden original/i }),
     ).not.toBeInTheDocument();
     await user.keyboard("{Escape}");
 
@@ -552,7 +552,7 @@ describe("MonthlyExpensesPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Columnas" }));
     const resetSortingMenuItem = screen.getByRole("menuitem", {
-      name: /Quitar ordenamiento/i,
+      name: /Restablecer orden original/i,
     });
     const columnVisibilityMenuLabel = screen.getByText("Mostrar columnas");
 
@@ -564,7 +564,7 @@ describe("MonthlyExpensesPage", () => {
     expect(screen.getByText("Ordenamiento activo")).toBeInTheDocument();
 
     await user.click(
-      screen.getByRole("menuitem", { name: /Quitar ordenamiento/i }),
+      screen.getByRole("menuitem", { name: /Restablecer orden original/i }),
     );
     await user.keyboard("{Escape}");
 
@@ -579,7 +579,7 @@ describe("MonthlyExpensesPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Columnas" }));
     expect(
-      screen.queryByRole("menuitem", { name: /Quitar ordenamiento/i }),
+      screen.queryByRole("menuitem", { name: /Restablecer orden original/i }),
     ).not.toBeInTheDocument();
   });
 
