@@ -60,6 +60,19 @@
   line-height: 1.2;
 }
 
+.totalLabel {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.totalFormula {
+  color: var(--muted-foreground);
+  font-size: 0.78rem;
+  font-weight: 400;
+}
+
 .fieldGroup {
   display: grid;
   gap: 0.4rem;

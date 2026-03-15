@@ -307,6 +307,10 @@ function ExpenseSheetContent({
     "Marcá esta opción si el gasto corresponde a una deuda.";
   const hasPendingChanges = changedFields.size > 0;
   const currencyPrefix = draft.currency === "USD" ? "US$" : "$";
+  const totalFormulaSubtotalAmount =
+    formatCurrencyDisplay(draft.subtotal).trim() || "X";
+  const totalFormulaSubtotal = `${currencyPrefix} ${totalFormulaSubtotalAmount}`;
+  const totalFormulaOccurrences = draft.occurrencesPerMonth.trim() || "Y";
   const selectedStartMonthDate = useMemo(
     () => parseMonthIdentifier(draft.startMonth),
     [draft.startMonth],
@@ -604,7 +608,13 @@ function ExpenseSheetContent({
                 />
 
                 <div className={styles.fieldGroup}>
-                  <Label htmlFor="expense-total">Total</Label>
+                  <Label className={styles.totalLabel} htmlFor="expense-total">
+                    <span>Total</span>
+                    <span className={styles.totalFormula}>
+                      (Subtotal {totalFormulaSubtotal} x {totalFormulaOccurrences} veces
+                      al mes)
+                    </span>
+                  </Label>
                   <InputGroup>
                     <InputGroupAddon align="inline-start" aria-hidden="true">
                       {currencyPrefix}
