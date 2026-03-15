@@ -137,7 +137,7 @@ function LoanSortColumnHeader({
             <ArrowUpDown aria-hidden="true" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" className={styles.loanSortPopover}>
+        <PopoverContent align="end" className={styles.loanSortPopover}>
           <p className={styles.loanSortPopoverTitle}>Criterio</p>
 
           <RadioGroup
