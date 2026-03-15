@@ -373,6 +373,8 @@ function LoanSortColumnHeader({
             })}
           </RadioGroup>
 
+          <p className={styles.loanSortHint}>Los cambios se aplican al presionar Aplicar.</p>
+
           <div className={styles.loanSortActions}>
             <Button
               className={styles.loanSortDiscardButton}

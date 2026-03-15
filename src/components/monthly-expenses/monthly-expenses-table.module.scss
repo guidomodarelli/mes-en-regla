@@ -233,6 +233,12 @@
   cursor: pointer;
 }
 
+.loanSortHint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
 .loanSortActions {
   display: flex;
   gap: 0.5rem;
