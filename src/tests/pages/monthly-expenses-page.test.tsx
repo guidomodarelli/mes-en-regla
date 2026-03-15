@@ -537,7 +537,7 @@ describe("MonthlyExpensesPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Columnas" }));
     expect(
-      screen.queryByRole("menuitem", { name: /Remover orden/i }),
+      screen.queryByRole("menuitem", { name: /Quitar ordenamiento/i }),
     ).not.toBeInTheDocument();
     await user.keyboard("{Escape}");
 
@@ -551,12 +551,22 @@ describe("MonthlyExpensesPage", () => {
     expect(screen.getByText("Columnas u orden modificados")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Columnas" }));
+    const resetSortingMenuItem = screen.getByRole("menuitem", {
+      name: /Quitar ordenamiento/i,
+    });
+    const columnVisibilityMenuLabel = screen.getByText("Mostrar columnas");
+
+    expect(resetSortingMenuItem).toBeInTheDocument();
     expect(
-      screen.getByRole("menuitem", { name: /Remover orden/i }),
-    ).toBeInTheDocument();
+      resetSortingMenuItem.compareDocumentPosition(columnVisibilityMenuLabel) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(screen.getByText("Ordenamiento activo")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("menuitem", { name: /Remover orden/i }));
+    await user.click(
+      screen.getByRole("menuitem", { name: /Quitar ordenamiento/i }),
+    );
+    await user.keyboard("{Escape}");
 
     expect(getMonthlyExpensesDescriptionsOrder()).toEqual([
       "Agua",
@@ -569,7 +579,7 @@ describe("MonthlyExpensesPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Columnas" }));
     expect(
-      screen.queryByRole("menuitem", { name: /Remover orden/i }),
+      screen.queryByRole("menuitem", { name: /Quitar ordenamiento/i }),
     ).not.toBeInTheDocument();
   });
 

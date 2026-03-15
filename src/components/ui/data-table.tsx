@@ -71,7 +71,7 @@ export function DataTable<TData, TValue>({
   showColumnVisibilityToggle = false,
   columnVisibilityButtonLabel = "Columnas",
   columnVisibilityMenuLabel = "Mostrar columnas",
-  resetSortingMenuItemLabel = "Remover orden",
+  resetSortingMenuItemLabel = "Quitar ordenamiento",
   selectAllColumnsLabel = "Seleccionar todas",
   deselectAllColumnsLabel = "Deseleccionar todas",
 }: DataTableProps<TData, TValue>) {
@@ -202,7 +202,9 @@ export function DataTable<TData, TValue>({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>{columnVisibilityMenuLabel}</DropdownMenuLabel>
+                      {!shouldShowResetSortingMenuItem ? (
+                        <DropdownMenuLabel>{columnVisibilityMenuLabel}</DropdownMenuLabel>
+                      ) : null}
                       {shouldShowResetSortingMenuItem ? (
                         <>
                           <DropdownMenuItem
@@ -220,6 +222,7 @@ export function DataTable<TData, TValue>({
                             <span className="sr-only">Ordenamiento activo</span>
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
+                          <DropdownMenuLabel>{columnVisibilityMenuLabel}</DropdownMenuLabel>
                         </>
                       ) : null}
                       <DropdownMenuItem
