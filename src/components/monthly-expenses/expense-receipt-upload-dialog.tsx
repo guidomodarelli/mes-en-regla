@@ -1,4 +1,18 @@
-import { useId, useMemo, useState, type ChangeEvent, type DragEvent } from "react";
+import {
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type DragEvent,
+} from "react";
+import {
+  CircleAlert,
+  CircleCheck,
+  LoaderCircle,
+  Trash2,
+  Upload,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -45,6 +59,36 @@ function formatPaymentCount(count: number): string {
   return `${count} pago${count === 1 ? "" : "s"}`;
 }
 
+function formatFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "0 KB";
+  }
+
+  const megabytes = bytes / (1024 * 1024);
+
+  if (megabytes >= 1) {
+    return `${megabytes.toFixed(1)} MB`;
+  }
+
+  const kilobytes = Math.max(1, Math.round(bytes / 1024));
+
+  return `${kilobytes} KB`;
+}
+
+function getFileExtension(fileName: string): string {
+  const normalizedFileName = fileName.trim();
+  const lastDotIndex = normalizedFileName.lastIndexOf(".");
+
+  if (
+    lastDotIndex <= 0 ||
+    lastDotIndex === normalizedFileName.length - 1
+  ) {
+    return "FILE";
+  }
+
+  return normalizedFileName.slice(lastDotIndex + 1).toUpperCase();
+}
+
 export function ExpenseReceiptUploadDialog({
   coveredPaymentsMax,
   coveredPaymentsRemaining,
@@ -59,6 +103,7 @@ export function ExpenseReceiptUploadDialog({
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [coverageMode, setCoverageMode] = useState<"full" | "partial">("full");
   const [partialCoveredPayments, setPartialCoveredPayments] = useState("1");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const inputIdBase = useId();
   const fullCoverageOptionId = `${inputIdBase}-full-coverage`;
   const partialCoverageOptionId = `${inputIdBase}-partial-coverage`;
@@ -80,6 +125,20 @@ export function ExpenseReceiptUploadDialog({
         : "Comprobante del gasto",
     [expenseDescription],
   );
+  const selectedFileExtension = selectedFile
+    ? getFileExtension(selectedFile.name)
+    : null;
+  const selectedFileSize = selectedFile
+    ? formatFileSize(selectedFile.size)
+    : null;
+  const selectedFileStatus: "ready" | "uploading" | "error" = !selectedFile
+    ? "ready"
+    : isSubmitting
+      ? "uploading"
+      : errorMessage
+        ? "error"
+        : "ready";
+  const uploadProgress = selectedFileStatus === "uploading" ? 55 : 100;
 
   const handleDialogOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -94,6 +153,18 @@ export function ExpenseReceiptUploadDialog({
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const nextFile = event.target.files?.[0] ?? null;
     setSelectedFile(nextFile);
+  };
+
+  const handleOpenFilePicker = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleClearSelectedFile = () => {
+    setSelectedFile(null);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
@@ -150,19 +221,97 @@ export function ExpenseReceiptUploadDialog({
             onDrop={handleDrop}
             role="region"
           >
+            <span className={styles.dropzoneIcon}>
+              <Upload aria-hidden="true" />
+            </span>
             <p className={styles.dropzoneText}>
               Arrastrá y soltá el archivo acá, o seleccioná uno desde tu equipo.
             </p>
+            <p className={styles.dropzoneHint}>PDF, JPG, PNG, WEBP, HEIC o HEIF (hasta 5MB).</p>
+            <Button
+              className={styles.filePickerButton}
+              onClick={handleOpenFilePicker}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              Seleccionar archivo
+            </Button>
             <Input
               accept={FILE_ACCEPT}
               className={styles.fileInput}
               onChange={handleFileChange}
+              ref={fileInputRef}
               type="file"
             />
           </div>
 
           {selectedFile ? (
-            <p className={styles.selectedFile}>Archivo: {selectedFile.name}</p>
+            <div className={styles.fileCard}>
+              <div className={styles.fileCardHeader}>
+                <span
+                  className={cn(
+                    styles.fileTypeBadge,
+                    selectedFile.type.startsWith("image/")
+                      ? styles.fileTypeBadgeImage
+                      : styles.fileTypeBadgeDocument,
+                  )}
+                >
+                  {selectedFileExtension}
+                </span>
+
+                <div className={styles.fileDetails}>
+                  <p className={styles.fileName}>{selectedFile.name}</p>
+                  <p className={styles.fileMeta}>
+                    <span>{selectedFileSize}</span>
+                    <span
+                      className={cn(
+                        styles.fileStatus,
+                        selectedFileStatus === "ready" && styles.fileStatusReady,
+                        selectedFileStatus === "uploading" && styles.fileStatusUploading,
+                        selectedFileStatus === "error" && styles.fileStatusError,
+                      )}
+                    >
+                      {selectedFileStatus === "uploading" ? (
+                        <LoaderCircle aria-hidden="true" className={styles.statusSpinner} />
+                      ) : null}
+                      {selectedFileStatus === "ready" ? (
+                        <CircleCheck aria-hidden="true" />
+                      ) : null}
+                      {selectedFileStatus === "error" ? (
+                        <CircleAlert aria-hidden="true" />
+                      ) : null}
+                      {selectedFileStatus === "uploading" ? "Subiendo..." : null}
+                      {selectedFileStatus === "ready" ? "Listo para subir" : null}
+                      {selectedFileStatus === "error" ? "Error en la carga" : null}
+                    </span>
+                  </p>
+                </div>
+
+                <Button
+                  aria-label={`Quitar archivo ${selectedFile.name}`}
+                  className={styles.fileRemoveButton}
+                  disabled={isSubmitting}
+                  onClick={handleClearSelectedFile}
+                  size="icon-sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  <Trash2 aria-hidden="true" />
+                </Button>
+              </div>
+
+              <div aria-hidden="true" className={styles.fileProgressTrack}>
+                <span
+                  className={cn(
+                    styles.fileProgressFill,
+                    selectedFileStatus === "uploading" && styles.fileProgressFillUploading,
+                    selectedFileStatus === "error" && styles.fileProgressFillError,
+                  )}
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            </div>
           ) : null}
 
           {shouldShowCoverageOptions ? (
@@ -244,10 +393,6 @@ export function ExpenseReceiptUploadDialog({
               ) : null}
             </div>
           ) : null}
-
-          <p className={styles.supportedTypes}>
-            Formatos permitidos: PDF, JPG, PNG, WEBP, HEIC, HEIF (hasta 5MB).
-          </p>
 
           {errorMessage ? (
             <p className={styles.errorText} role="alert">
