@@ -2,7 +2,10 @@
   "servers": {
     "shadcn": {
       "command": "npx",
-      "args": ["shadcn@latest", "mcp"]
+      "args": [
+        "shadcn@latest",
+        "mcp"
+      ]
     },
     "chrome-devtools": {
       "command": "npx",
@@ -10,6 +13,13 @@
         "-y",
         "chrome-devtools-mcp@latest",
         "--browser-url=http://127.0.0.1:9222"
+      ]
+    },
+    "magicuidesign-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@magicuidesign/mcp@latest"
       ]
     }
   }
