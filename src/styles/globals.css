@@ -6,8 +6,6 @@
 
 :root {
   color-scheme: light;
-  --transition__duration: 0.75s;
-  --transition__easing: ease-in-out;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --radius: 0.625rem;
@@ -88,80 +86,6 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
   min-height: 100vh;
-}
-
-@view-transition {
-  navigation: auto;
-}
-
-@keyframes fade-out {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-::view-transition-old(root) {
-  animation: fade-out 0.3s;
-}
-
-::view-transition-new(root) {
-  animation: fade-in 0.3s;
-}
-
-@keyframes circle-in-center {
-  from {
-    clip-path: circle(0%);
-  }
-  to {
-    clip-path: circle(125%);
-  }
-}
-
-[transition-style="in:circle:center"] {
-  animation: var(--transition__duration) var(--transition__easing)
-    circle-in-center both;
-}
-
-[transition-style="in:circle:center"]::view-transition-old(root),
-[transition-style="in:circle:center"]::view-transition-new(root) {
-  animation-duration: var(--transition__duration);
-}
-
-[transition-style="in:circle:center"]::view-transition-old(root) {
-  animation-name: none;
-}
-
-[transition-style="in:circle:center"]::view-transition-new(root) {
-  animation: var(--transition__duration) var(--transition__easing)
-    circle-in-center both;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-old(root),
-  ::view-transition-new(root) {
-    animation: none;
-  }
-
-  [transition-style="in:circle:center"] {
-    animation: none;
-  }
-
-  [transition-style="in:circle:center"]::view-transition-old(root),
-  [transition-style="in:circle:center"]::view-transition-new(root) {
-    animation: none;
-  }
 }
 
 html.dark {
