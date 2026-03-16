@@ -1130,29 +1130,36 @@ export function MonthlyExpensesTable({
   validationMessage,
 }: MonthlyExpensesTableProps) {
   const hasSkippedInitialPersistence = useRef(false);
-  const initialTablePreferences = useMemo(
-    () =>
-      getPersistedMonthlyExpensesTablePreferences() ?? {
-        columnVisibility: {},
-        loanSortMode: DEFAULT_LOAN_SORT_MODE,
-        sorting: [],
-      },
-    [],
-  );
   const [loanSortMode, setLoanSortMode] =
-    useState<LoanSortMode>(initialTablePreferences.loanSortMode);
-  const [sorting, setSorting] = useState<SortingState>(
-    initialTablePreferences.sorting,
-  );
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
-    initialTablePreferences.columnVisibility,
-  );
+    useState<LoanSortMode>(DEFAULT_LOAN_SORT_MODE);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [isRestoringTablePreferences, setIsRestoringTablePreferences] =
+    useState(true);
   const [descriptionFilter, setDescriptionFilter] = useState("");
   const [paymentLinkDialogState, setPaymentLinkDialogState] =
     useState<PaymentLinkDialogState | null>(null);
   const [paymentLinkDraftValue, setPaymentLinkDraftValue] = useState("");
   const [paymentLinkDraftError, setPaymentLinkDraftError] =
     useState<string | null>(null);
+
+  useEffect(() => {
+    const persistedPreferences = getPersistedMonthlyExpensesTablePreferences();
+
+    const restoreFrameId = window.requestAnimationFrame(() => {
+      if (persistedPreferences) {
+        setLoanSortMode(persistedPreferences.loanSortMode);
+        setSorting(persistedPreferences.sorting);
+        setColumnVisibility(persistedPreferences.columnVisibility);
+      }
+
+      setIsRestoringTablePreferences(false);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(restoreFrameId);
+    };
+  }, []);
 
   useEffect(() => {
     if (!hasSkippedInitialPersistence.current) {
@@ -2264,6 +2271,24 @@ export function MonthlyExpensesTable({
           </div>
 
           <div className={styles.tableWrapper}>
+            {isRestoringTablePreferences ? (
+              <div
+                aria-label="Cargando configuración de tabla"
+                aria-live="polite"
+                className={styles.tableLoadingOverlay}
+                role="status"
+              >
+                <div className={styles.tableLoadingContent}>
+                  <span
+                    aria-hidden="true"
+                    className={styles.tableLoadingSpinner}
+                  />
+                  <span className={styles.tableLoadingText}>
+                    Cargando configuración de tabla...
+                  </span>
+                </div>
+              </div>
+            ) : null}
             <DataTable
               columnVisibility={columnVisibility}
               columnVisibilityButtonLabel="Columnas"
