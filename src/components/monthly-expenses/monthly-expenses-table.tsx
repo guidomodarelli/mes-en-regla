@@ -90,7 +90,7 @@ const LOAN_SORT_COLUMN_ID = "loanProgress";
 const LOAN_INSTALLMENT_START_COLUMN_ID = "loanInstallmentStart";
 const LOAN_INSTALLMENT_END_COLUMN_ID = "loanInstallmentEnd";
 const MONTHLY_EXPENSES_TABLE_PREFERENCES_STORAGE_KEY =
-  "mis-finanzas.monthly-expenses.table-preferences";
+  "xfly.monthly-expenses.table-preferences";
 const SORTABLE_COLUMN_IDS = new Set([
   "description",
   "paymentsProgress",

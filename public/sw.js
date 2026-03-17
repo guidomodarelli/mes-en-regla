@@ -1,4 +1,4 @@
-const CACHE_NAME = "mis-finanzas-static-v1";
+const CACHE_NAME = "xfly-static-v1";
 
 const PRECACHE_URLS = [
   "/",

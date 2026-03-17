@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/tooltip"
 import { IconLayoutSidebar } from "@tabler/icons-react"
 
-const SIDEBAR_STORAGE_KEY = "mis-finanzas.sidebar.open"
+const SIDEBAR_STORAGE_KEY = "xfly.sidebar.open"
 const SIDEBAR_STORAGE_VALUE_OPEN = "true"
 const SIDEBAR_STORAGE_VALUE_COLLAPSED = "false"
 const SIDEBAR_COOKIE_NAME = SIDEBAR_STORAGE_KEY
