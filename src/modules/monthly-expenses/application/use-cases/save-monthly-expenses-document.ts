@@ -83,8 +83,11 @@ async function syncReceiptFolderRenames({
     const nextFolderId =
       nextItem.folders?.allReceiptsFolderId?.trim() ||
       nextItem.receipts[0]?.allReceiptsFolderId?.trim();
-
-    if (!currentFolderId || !nextFolderId || currentFolderId !== nextFolderId) {
+    if (
+      !currentFolderId ||
+      !nextFolderId ||
+      currentFolderId !== nextFolderId
+    ) {
       continue;
     }
 

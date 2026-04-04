@@ -420,4 +420,38 @@ describe("monthlyExpensesGoogleDriveMapper", () => {
     });
     expect(parsed.items[0]?.receipts).toEqual([]);
   });
+
+  it("parses shared folder metadata when the monthly folder reference is blank", () => {
+    const result = parseGoogleDriveMonthlyExpensesContent(
+      JSON.stringify({
+        items: [
+          {
+            currency: "ARS",
+            description: "Internet",
+            folders: {
+              allReceiptsFolderId: "receipt-folder-id",
+              allReceiptsFolderViewUrl:
+                "https://drive.google.com/drive/folders/receipt-folder-id",
+              monthlyFolderId: "",
+              monthlyFolderViewUrl: "",
+            },
+            id: "expense-1",
+            occurrencesPerMonth: 1,
+            subtotal: 45,
+          },
+        ],
+        month: "2026-03",
+      }),
+      "Loading monthly expenses",
+    );
+
+    expect(result.items[0]?.folders).toEqual({
+      allReceiptsFolderId: "receipt-folder-id",
+      allReceiptsFolderViewUrl:
+        "https://drive.google.com/drive/folders/receipt-folder-id",
+      monthlyFolderId: "",
+      monthlyFolderViewUrl: "",
+    });
+    expect(result.items[0]?.receipts).toEqual([]);
+  });
 });

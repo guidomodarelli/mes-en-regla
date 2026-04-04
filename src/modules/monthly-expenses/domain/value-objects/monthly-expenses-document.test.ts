@@ -655,4 +655,38 @@ describe("monthlyExpensesDocument", () => {
     });
     expect(result.items[0]?.receipts).toEqual([]);
   });
+
+  it("keeps shared folder metadata when the monthly folder reference is intentionally blank", () => {
+    const result = createMonthlyExpensesDocument(
+      {
+        items: [
+          {
+            currency: "ARS",
+            description: "Internet",
+            folders: {
+              allReceiptsFolderId: " receipt-folder-id ",
+              allReceiptsFolderViewUrl:
+                "https://drive.google.com/drive/folders/receipt-folder-id",
+              monthlyFolderId: " ",
+              monthlyFolderViewUrl: " ",
+            },
+            id: "expense-1",
+            occurrencesPerMonth: 1,
+            receipts: [],
+            subtotal: 45,
+          },
+        ],
+        month: "2026-03",
+      },
+      "Saving monthly expenses",
+    );
+
+    expect(result.items[0]?.folders).toEqual({
+      allReceiptsFolderId: "receipt-folder-id",
+      allReceiptsFolderViewUrl:
+        "https://drive.google.com/drive/folders/receipt-folder-id",
+      monthlyFolderId: "",
+      monthlyFolderViewUrl: "",
+    });
+  });
 });

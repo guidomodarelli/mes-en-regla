@@ -11,6 +11,7 @@ import {
   getSafeLoansReportErrorMessage,
   getSafeMonthlyExpensesErrorMessage,
 } from "@/modules/monthly-expenses/application/queries/get-monthly-expenses-page-feedback";
+import { copyMonthlyExpenseTemplatesToMonth } from "@/modules/monthly-expenses/shared/pages/monthly-expenses-page";
 import type { StorageBootstrapResult } from "@/modules/storage/application/results/storage-bootstrap";
 import MonthlyExpensesPage, {
   getRequestedMonthlyExpensesTab,
@@ -133,9 +134,20 @@ function createMonthlyExpensesFetchMock(overrides?: {
     month: string;
   };
   reportEntries?: Array<Record<string, unknown>>;
+  saveError?: string;
 }) {
   return jest.fn().mockImplementation(async (input: RequestInfo | URL) => {
     if (input === "/api/storage/monthly-expenses") {
+      if (overrides?.saveError) {
+        return {
+          json: async () => ({
+            error: overrides.saveError,
+          }),
+          ok: false,
+          status: 500,
+        };
+      }
+
       return {
         ok: true,
         status: 204,
@@ -1331,7 +1343,7 @@ describe("MonthlyExpensesPage", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("copies rows from a selected saved month without auto-saving", async () => {
+  it("copies rows from a selected saved month and persists them", async () => {
     const user = userEvent.setup();
     const fetchMock = createMonthlyExpensesFetchMock({
       monthlyDocument: {
@@ -1386,12 +1398,275 @@ describe("MonthlyExpensesPage", () => {
     });
 
     expect(screen.getByText("Internet")).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalledWith(
-      "/api/storage/monthly-expenses",
-      expect.objectContaining({
-        method: "POST",
-      }),
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/storage/monthly-expenses",
+        expect.objectContaining({
+          method: "POST",
+        }),
+      );
+    });
+
+    expect(getMonthlyExpensesSavePayload(fetchMock)).toEqual({
+      items: [
+        {
+          currency: "ARS",
+          description: "Internet",
+          id: expect.any(String),
+          occurrencesPerMonth: 1,
+          paymentLink: null,
+          subtotal: 12000,
+        },
+      ],
+      month: "2026-03",
+    });
+  });
+
+  it("preserves shared folder metadata when copying a month without monthly folder metadata", async () => {
+    const user = userEvent.setup();
+    const sharedReceiptsFolderViewUrl =
+      "https://drive.google.com/drive/folders/all-folder-1";
+    const fetchMock = createMonthlyExpensesFetchMock({
+      monthlyDocument: {
+        items: [
+          {
+            currency: "ARS",
+            description: "Internet",
+            folders: {
+              allReceiptsFolderId: "all-folder-1",
+              allReceiptsFolderStatus: "missing",
+              allReceiptsFolderViewUrl: sharedReceiptsFolderViewUrl,
+              monthlyFolderId: "",
+              monthlyFolderViewUrl: "",
+            },
+            id: "expense-source-1",
+            occurrencesPerMonth: 1,
+            subtotal: 12000,
+            total: 12000,
+          },
+        ],
+        month: "2026-02",
+      },
+    });
+
+    mockedUseSession.mockReturnValue({
+      data: {
+        expires: "2099-01-01T00:00:00.000Z",
+        user: {
+          email: "gus@example.com",
+          name: "Gus",
+        },
+      },
+      status: "authenticated",
+      update: jest.fn(),
+    } as ReturnType<typeof useSession>);
+    global.fetch = fetchMock as typeof fetch;
+
+    renderWithProviders(
+      <MonthlyExpensesPage
+        {...basePageProps}
+        initialCopyableMonths={{
+          defaultSourceMonth: "2026-02",
+          sourceMonths: ["2026-02", "2026-01"],
+          targetMonth: "2026-03",
+        }}
+        initialDocument={{
+          items: [],
+          month: "2026-03",
+        }}
+      />,
     );
+
+    await user.click(screen.getByRole("button", { name: "Copia de" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/storage/monthly-expenses",
+        expect.objectContaining({
+          method: "POST",
+        }),
+      );
+    });
+
+    expect(getMonthlyExpensesSavePayload(fetchMock)).toEqual({
+      items: [
+        {
+          currency: "ARS",
+          description: "Internet",
+          folders: {
+            allReceiptsFolderId: "all-folder-1",
+            allReceiptsFolderViewUrl: sharedReceiptsFolderViewUrl,
+            monthlyFolderId: "",
+            monthlyFolderViewUrl: "",
+          },
+          id: expect.any(String),
+          occurrencesPerMonth: 1,
+          paymentLink: null,
+          subtotal: 12000,
+        },
+      ],
+      month: "2026-03",
+    });
+  });
+
+  it("keeps the empty state when persisting a copied month fails", async () => {
+    const user = userEvent.setup();
+    const fetchMock = createMonthlyExpensesFetchMock({
+      monthlyDocument: {
+        items: [
+          {
+            currency: "ARS",
+            description: "Internet",
+            id: "expense-source-1",
+            occurrencesPerMonth: 1,
+            subtotal: 12000,
+            total: 12000,
+          },
+        ],
+        month: "2026-02",
+      },
+      saveError: "save failed",
+    });
+
+    mockedUseSession.mockReturnValue({
+      data: {
+        expires: "2099-01-01T00:00:00.000Z",
+        user: {
+          email: "gus@example.com",
+          name: "Gus",
+        },
+      },
+      status: "authenticated",
+      update: jest.fn(),
+    } as ReturnType<typeof useSession>);
+    global.fetch = fetchMock as typeof fetch;
+
+    renderWithProviders(
+      <MonthlyExpensesPage
+        {...basePageProps}
+        initialCopyableMonths={{
+          defaultSourceMonth: "2026-02",
+          sourceMonths: ["2026-02", "2026-01"],
+          targetMonth: "2026-03",
+        }}
+        initialDocument={{
+          items: [],
+          month: "2026-03",
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Copia de" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/storage/monthly-expenses",
+        expect.objectContaining({
+          method: "POST",
+        }),
+      );
+    });
+
+    expect(screen.queryByText("Internet")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copia de" })).toBeInTheDocument();
+  });
+
+  it("copies the expense template without carrying folder references", () => {
+    const sharedReceiptsFolderViewUrl =
+      "https://drive.google.com/drive/folders/all-folder-1";
+    const copiedRows = copyMonthlyExpenseTemplatesToMonth("2026-03", [
+      {
+        allReceiptsFolderId: "all-folder-1",
+        allReceiptsFolderStatus: "missing",
+        allReceiptsFolderViewUrl: sharedReceiptsFolderViewUrl,
+        currency: "USD",
+        description: "Tarjeta",
+        id: "expense-source-1",
+        installmentCount: "12",
+        isLoan: true,
+        lenderId: "lender-1",
+        lenderName: "Banco",
+        loanEndMonth: "2026-12",
+        loanPaidInstallments: 2,
+        loanProgress: "2 de 12 cuotas pagadas",
+        loanRemainingInstallments: 10,
+        loanTotalInstallments: 12,
+        manualCoveredPayments: "2",
+        monthlyFolderId: "monthly-folder-1",
+        monthlyFolderStatus: "trashed",
+        monthlyFolderViewUrl:
+          "https://drive.google.com/drive/folders/monthly-folder-1",
+        occurrencesPerMonth: "3",
+        paymentLink: "https://pagos.example.com/tarjeta",
+        receiptShareMessage: "Enviar comprobante",
+        receiptSharePhoneDigits: "5491122334455",
+        receiptShareStatus: "sent",
+        requiresReceiptShare: true,
+        receipts: [
+          {
+            allReceiptsFolderId: "all-folder-1",
+            allReceiptsFolderStatus: "normal",
+            allReceiptsFolderViewUrl: sharedReceiptsFolderViewUrl,
+            coveredPayments: 2,
+            fileId: "file-1",
+            fileName: "ticket.pdf",
+            fileStatus: "normal",
+            fileViewUrl: "https://drive.google.com/file/d/file-1/view",
+            monthlyFolderId: "monthly-folder-1",
+            monthlyFolderStatus: "normal",
+            monthlyFolderViewUrl:
+              "https://drive.google.com/drive/folders/monthly-folder-1",
+          },
+        ],
+        startMonth: "2026-01",
+        subtotal: "10",
+        total: "30.00",
+      },
+    ]);
+
+    expect(copiedRows).toHaveLength(1);
+    expect(copiedRows[0]).toEqual({
+      allReceiptsFolderId: "all-folder-1",
+      allReceiptsFolderStatus: undefined,
+      allReceiptsFolderViewUrl:
+        "https://drive.google.com/drive/folders/all-folder-1",
+      currency: "USD",
+      description: "Tarjeta",
+      id: expect.any(String),
+      installmentCount: "12",
+      isLoan: true,
+      lenderId: "lender-1",
+      lenderName: "Banco",
+      loanEndMonth: "2026-12",
+      loanPaidInstallments: 3,
+      loanProgress: "3 de 12 cuotas pagadas",
+      loanRemainingInstallments: 9,
+      loanTotalInstallments: 12,
+      manualCoveredPayments: "0",
+      monthlyFolderId: "",
+      monthlyFolderViewUrl: "",
+      occurrencesPerMonth: "3",
+      paymentLink: "https://pagos.example.com/tarjeta",
+      receiptShareMessage: "Enviar comprobante",
+      receiptSharePhoneDigits: "5491122334455",
+      receiptShareStatus: "",
+      requiresReceiptShare: true,
+      receipts: [],
+      startMonth: "2026-01",
+      subtotal: "10",
+      total: "30.00",
+    });
+    expect(copiedRows[0]?.id).not.toBe("expense-source-1");
+    expect(copiedRows[0]?.allReceiptsFolderStatus).toBeUndefined();
+    expect(copiedRows[0]?.monthlyFolderStatus).toBeUndefined();
+    expect(copiedRows[0]?.receipts).toEqual([]);
+    expect(copiedRows[0]?.allReceiptsFolderId).toBe("all-folder-1");
+    expect(copiedRows[0]?.allReceiptsFolderViewUrl).toBe(
+      "https://drive.google.com/drive/folders/all-folder-1",
+    );
+    expect(copiedRows[0]?.monthlyFolderId).toBe("");
+    expect(copiedRows[0]?.monthlyFolderViewUrl).toBe("");
   });
 
   it("opens a modal to create a new expense, without showing an opening toast", async () => {
@@ -5189,6 +5464,93 @@ describe("MonthlyExpensesPage", () => {
     await waitFor(() => {
       expect(getMonthlyExpensesSavePayload(fetchMock).month).toBe("2026-03");
     });
+
+    expect(getMonthlyExpensesSavePayload(fetchMock).items[0]?.folders).toBeUndefined();
+  });
+
+  it("does not rebuild the monthly folder reference from receipts after confirming removal", async () => {
+    const user = userEvent.setup();
+    const fetchMock = createMonthlyExpensesFetchMock();
+
+    mockedUseSession.mockReturnValue({
+      data: {
+        expires: "2099-01-01T00:00:00.000Z",
+        user: {
+          email: "gus@example.com",
+          name: "Gus",
+        },
+      },
+      status: "authenticated",
+      update: jest.fn(),
+    } as ReturnType<typeof useSession>);
+    global.fetch = fetchMock as typeof fetch;
+
+    renderWithProviders(
+      <MonthlyExpensesPage
+        {...basePageProps}
+        initialDocument={{
+          items: [
+            {
+              currency: "ARS",
+              description: "Internet",
+              folders: {
+                allReceiptsFolderId: "receipt-folder-id",
+                allReceiptsFolderViewUrl:
+                  "https://drive.google.com/drive/folders/receipt-folder-id",
+                monthlyFolderId: "receipt-month-folder-id",
+                monthlyFolderStatus: "missing",
+                monthlyFolderViewUrl:
+                  "https://drive.google.com/drive/folders/receipt-month-folder-id",
+              },
+              id: "expense-1",
+              occurrencesPerMonth: 1,
+              paymentLink: null,
+              receipts: [
+                {
+                  allReceiptsFolderId: "receipt-folder-id",
+                  allReceiptsFolderViewUrl:
+                    "https://drive.google.com/drive/folders/receipt-folder-id",
+                  coveredPayments: 1,
+                  fileId: "receipt-file-id",
+                  fileName: "comprobante.pdf",
+                  fileViewUrl:
+                    "https://drive.google.com/file/d/receipt-file-id/view",
+                  monthlyFolderId: "receipt-month-folder-id",
+                  monthlyFolderViewUrl:
+                    "https://drive.google.com/drive/folders/receipt-month-folder-id",
+                },
+              ],
+              subtotal: 100,
+              total: 100,
+            },
+          ],
+          month: "2026-03",
+        }}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Quitar referencia de carpeta del mes actual",
+      }),
+    );
+    await user.click(
+      screen.getByRole("button", {
+        name: "Confirmar quitar referencia de carpeta del mes actual",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(getMonthlyExpensesSavePayload(fetchMock).month).toBe("2026-03");
+    });
+
+    expect(getMonthlyExpensesSavePayload(fetchMock).items[0]?.folders).toEqual({
+      allReceiptsFolderId: "receipt-folder-id",
+      allReceiptsFolderViewUrl:
+        "https://drive.google.com/drive/folders/receipt-folder-id",
+      monthlyFolderId: "",
+      monthlyFolderViewUrl: "",
+    });
   });
 
   it("removes all-receipts folder reference only after confirmation", async () => {
@@ -5275,6 +5637,84 @@ describe("MonthlyExpensesPage", () => {
     await waitFor(() => {
       expect(getMonthlyExpensesSavePayload(fetchMock).month).toBe("2026-03");
     });
+  });
+
+  it("does not rebuild the shared receipts folder reference from receipts after confirming removal", async () => {
+    const user = userEvent.setup();
+    const fetchMock = createMonthlyExpensesFetchMock();
+
+    mockedUseSession.mockReturnValue({
+      data: {
+        expires: "2099-01-01T00:00:00.000Z",
+        user: {
+          email: "gus@example.com",
+          name: "Gus",
+        },
+      },
+      status: "authenticated",
+      update: jest.fn(),
+    } as ReturnType<typeof useSession>);
+    global.fetch = fetchMock as typeof fetch;
+
+    renderWithProviders(
+      <MonthlyExpensesPage
+        {...basePageProps}
+        initialDocument={{
+          items: [
+            {
+              currency: "ARS",
+              description: "Internet",
+              folders: {
+                allReceiptsFolderId: "receipt-folder-id",
+                allReceiptsFolderStatus: "missing",
+                allReceiptsFolderViewUrl:
+                  "https://drive.google.com/drive/folders/receipt-folder-id",
+                monthlyFolderId: "",
+                monthlyFolderViewUrl: "",
+              },
+              id: "expense-1",
+              occurrencesPerMonth: 1,
+              paymentLink: null,
+              receipts: [
+                {
+                  allReceiptsFolderId: "receipt-folder-id",
+                  allReceiptsFolderViewUrl:
+                    "https://drive.google.com/drive/folders/receipt-folder-id",
+                  coveredPayments: 1,
+                  fileId: "receipt-file-id",
+                  fileName: "comprobante.pdf",
+                  fileViewUrl:
+                    "https://drive.google.com/file/d/receipt-file-id/view",
+                  monthlyFolderId: "receipt-month-folder-id",
+                  monthlyFolderViewUrl:
+                    "https://drive.google.com/drive/folders/receipt-month-folder-id",
+                },
+              ],
+              subtotal: 100,
+              total: 100,
+            },
+          ],
+          month: "2026-03",
+        }}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Quitar referencia de carpeta de comprobantes",
+      }),
+    );
+    await user.click(
+      screen.getByRole("button", {
+        name: "Confirmar quitar referencia de carpeta de comprobantes",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(getMonthlyExpensesSavePayload(fetchMock).month).toBe("2026-03");
+    });
+
+    expect(getMonthlyExpensesSavePayload(fetchMock).items[0]?.folders).toBeUndefined();
   });
 
   it("sorts Link keeping empty values at the end in both directions", async () => {

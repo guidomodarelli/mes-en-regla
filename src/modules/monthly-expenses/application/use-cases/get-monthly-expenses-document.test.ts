@@ -141,4 +141,198 @@ describe("getMonthlyExpensesDocument", () => {
         "https://drive.google.com/drive/folders/receipt-month-folder-id",
     });
   });
+
+  it("verifies the shared receipts folder even when the monthly folder reference is empty", async () => {
+    const repository: MonthlyExpensesRepository = {
+      getByMonth: jest.fn().mockResolvedValue({
+        items: [
+          {
+            currency: "ARS",
+            description: "Internet",
+            folders: {
+              allReceiptsFolderId: "receipt-folder-id",
+              allReceiptsFolderViewUrl:
+                "https://drive.google.com/drive/folders/receipt-folder-id",
+              monthlyFolderId: "",
+              monthlyFolderViewUrl: "",
+            },
+            id: "expense-1",
+            occurrencesPerMonth: 1,
+            receipts: [],
+            subtotal: 100,
+            total: 100,
+          },
+        ],
+        month: "2026-03",
+      }),
+      listAll: jest.fn(),
+      save: jest.fn(),
+    };
+    const receiptsRepository: MonthlyExpenseReceiptsRepository = {
+      deleteReceipt: jest.fn(),
+      renameExpenseFolder: jest.fn(),
+      renameReceiptFile: jest.fn(),
+      saveReceipt: jest.fn(),
+      verifyFolders: jest.fn().mockResolvedValue({
+        allReceiptsFolderStatus: "missing",
+      }),
+      verifyReceipt: jest.fn(),
+    };
+
+    const result = await getMonthlyExpensesDocument({
+      getExchangeRateSnapshot,
+      query: {
+        month: "2026-03",
+      },
+      receiptsRepository,
+      repository,
+    });
+
+    expect(receiptsRepository.verifyFolders).toHaveBeenCalledWith({
+      allReceiptsFolderId: "receipt-folder-id",
+      monthlyFolderId: "",
+    });
+    expect(result.items[0]?.folders).toEqual({
+      allReceiptsFolderId: "receipt-folder-id",
+      allReceiptsFolderStatus: "missing",
+      allReceiptsFolderViewUrl:
+        "https://drive.google.com/drive/folders/receipt-folder-id",
+      monthlyFolderId: "",
+      monthlyFolderViewUrl: "",
+    });
+  });
+
+  it("preserves an explicitly cleared monthly folder id instead of falling back to receipt metadata", async () => {
+    const repository: MonthlyExpensesRepository = {
+      getByMonth: jest.fn().mockResolvedValue({
+        items: [
+          {
+            currency: "ARS",
+            description: "Internet",
+            folders: {
+              allReceiptsFolderId: "receipt-folder-id",
+              allReceiptsFolderViewUrl:
+                "https://drive.google.com/drive/folders/receipt-folder-id",
+              monthlyFolderId: "",
+              monthlyFolderViewUrl: "",
+            },
+            id: "expense-1",
+            occurrencesPerMonth: 1,
+            receipts: [
+              {
+                allReceiptsFolderId: "receipt-folder-id",
+                allReceiptsFolderViewUrl:
+                  "https://drive.google.com/drive/folders/receipt-folder-id",
+                fileId: "receipt-file-id",
+                fileName: "comprobante.pdf",
+                fileViewUrl:
+                  "https://drive.google.com/file/d/receipt-file-id/view",
+                monthlyFolderId: "receipt-month-folder-id",
+                monthlyFolderViewUrl:
+                  "https://drive.google.com/drive/folders/receipt-month-folder-id",
+              },
+            ],
+            subtotal: 100,
+            total: 100,
+          },
+        ],
+        month: "2026-03",
+      }),
+      listAll: jest.fn(),
+      save: jest.fn(),
+    };
+    const receiptsRepository: MonthlyExpenseReceiptsRepository = {
+      deleteReceipt: jest.fn(),
+      renameExpenseFolder: jest.fn(),
+      renameReceiptFile: jest.fn(),
+      saveReceipt: jest.fn(),
+      verifyFolders: jest.fn().mockResolvedValue({
+        allReceiptsFolderStatus: "normal",
+        monthlyFolderStatus: "missing",
+      }),
+      verifyReceipt: jest.fn(),
+    };
+
+    const result = await getMonthlyExpensesDocument({
+      getExchangeRateSnapshot,
+      query: {
+        month: "2026-03",
+      },
+      receiptsRepository,
+      repository,
+    });
+
+    expect(receiptsRepository.verifyFolders).toHaveBeenCalledWith({
+      allReceiptsFolderId: "receipt-folder-id",
+      monthlyFolderId: "",
+    });
+    expect(result.items[0]?.folders).toEqual({
+      allReceiptsFolderId: "receipt-folder-id",
+      allReceiptsFolderStatus: "normal",
+      allReceiptsFolderViewUrl:
+        "https://drive.google.com/drive/folders/receipt-folder-id",
+      monthlyFolderId: "",
+      monthlyFolderStatus: "missing",
+      monthlyFolderViewUrl: "",
+    });
+  });
+
+  it("falls back to receipt folder metadata only when top-level folder metadata is absent", async () => {
+    const repository: MonthlyExpensesRepository = {
+      getByMonth: jest.fn().mockResolvedValue({
+        items: [
+          {
+            currency: "ARS",
+            description: "Internet",
+            id: "expense-1",
+            occurrencesPerMonth: 1,
+            receipts: [
+              {
+                allReceiptsFolderId: "receipt-folder-id",
+                allReceiptsFolderViewUrl:
+                  "https://drive.google.com/drive/folders/receipt-folder-id",
+                fileId: "receipt-file-id",
+                fileName: "comprobante.pdf",
+                fileViewUrl:
+                  "https://drive.google.com/file/d/receipt-file-id/view",
+                monthlyFolderId: "receipt-month-folder-id",
+                monthlyFolderViewUrl:
+                  "https://drive.google.com/drive/folders/receipt-month-folder-id",
+              },
+            ],
+            subtotal: 100,
+            total: 100,
+          },
+        ],
+        month: "2026-03",
+      }),
+      listAll: jest.fn(),
+      save: jest.fn(),
+    };
+    const receiptsRepository: MonthlyExpenseReceiptsRepository = {
+      deleteReceipt: jest.fn(),
+      renameExpenseFolder: jest.fn(),
+      renameReceiptFile: jest.fn(),
+      saveReceipt: jest.fn(),
+      verifyFolders: jest.fn().mockResolvedValue({
+        allReceiptsFolderStatus: "normal",
+        monthlyFolderStatus: "missing",
+      }),
+      verifyReceipt: jest.fn(),
+    };
+
+    await getMonthlyExpensesDocument({
+      getExchangeRateSnapshot,
+      query: {
+        month: "2026-03",
+      },
+      receiptsRepository,
+      repository,
+    });
+
+    expect(receiptsRepository.verifyFolders).toHaveBeenCalledWith({
+      allReceiptsFolderId: "receipt-folder-id",
+      monthlyFolderId: "receipt-month-folder-id",
+    });
+  });
 });

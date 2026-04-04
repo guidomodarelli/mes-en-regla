@@ -17,7 +17,7 @@ export type MonthlyExpenseDriveResourceStatus =
 export interface MonthlyExpenseReceiptDriveStatus {
   allReceiptsFolderStatus: MonthlyExpenseDriveResourceStatus;
   fileStatus: MonthlyExpenseDriveResourceStatus;
-  monthlyFolderStatus: MonthlyExpenseDriveResourceStatus;
+  monthlyFolderStatus?: MonthlyExpenseDriveResourceStatus;
 }
 
 export interface MonthlyExpenseReceiptResult extends MonthlyExpenseReceipt {

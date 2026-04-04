@@ -266,4 +266,32 @@ describe("GoogleDriveMonthlyExpenseReceiptsRepository", () => {
       monthlyFolderStatus: "missing",
     });
   });
+
+  it("verifies only the shared receipts folder when the monthly folder reference is empty", async () => {
+    const { driveClient, files } = createDriveClientMock();
+
+    files.get.mockResolvedValue({
+      data: {
+        id: "expense-folder-id",
+        trashed: true,
+      },
+    });
+
+    const repository = new GoogleDriveMonthlyExpenseReceiptsRepository(driveClient);
+
+    await expect(
+      repository.verifyFolders({
+        allReceiptsFolderId: "expense-folder-id",
+        monthlyFolderId: "",
+      }),
+    ).resolves.toEqual({
+      allReceiptsFolderStatus: "trashed",
+      monthlyFolderStatus: undefined,
+    });
+    expect(files.get).toHaveBeenCalledTimes(1);
+    expect(files.get).toHaveBeenCalledWith({
+      fields: "id,trashed",
+      fileId: "expense-folder-id",
+    });
+  });
 });

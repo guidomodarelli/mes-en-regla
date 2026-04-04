@@ -117,12 +117,26 @@ const monthlyExpenseFoldersSchema = z.object({
     .string()
     .trim()
     .refine((value) => RECEIPT_VIEW_URL_SCHEMA.safeParse(value).success),
-  monthlyFolderId: z.string().trim().min(1),
+  monthlyFolderId: z.string().trim(),
   monthlyFolderViewUrl: z
     .string()
     .trim()
-    .refine((value) => RECEIPT_VIEW_URL_SCHEMA.safeParse(value).success),
-}).strict();
+    .refine(
+      (value) => value.length === 0 || RECEIPT_VIEW_URL_SCHEMA.safeParse(value).success,
+    ),
+}).strict().superRefine((value, context) => {
+  const hasMonthlyFolderId = value.monthlyFolderId.length > 0;
+  const hasMonthlyFolderViewUrl = value.monthlyFolderViewUrl.length > 0;
+
+  if (hasMonthlyFolderId !== hasMonthlyFolderViewUrl) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message:
+        "monthly-expenses mapper requires monthly folder metadata to include both fields or neither one.",
+      path: ["monthlyFolderId"],
+    });
+  }
+});
 
 const legacyMonthlyExpenseReceiptSchema = z.object({
   fileId: z.string().trim().min(1),

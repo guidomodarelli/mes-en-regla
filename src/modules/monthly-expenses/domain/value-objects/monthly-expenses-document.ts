@@ -441,9 +441,18 @@ function validateFolders(
     monthlyFolderViewUrl: folders.monthlyFolderViewUrl.trim(),
   };
 
-  if (!normalizedFolders.monthlyFolderId || !normalizedFolders.allReceiptsFolderId) {
+  if (!normalizedFolders.allReceiptsFolderId) {
     throw new Error(
-      `${operationName} requires folder metadata to include monthly and all-receipts folder identifiers.`,
+      `${operationName} requires folder metadata to include an all-receipts folder identifier.`,
+    );
+  }
+
+  const hasMonthlyFolderId = normalizedFolders.monthlyFolderId.length > 0;
+  const hasMonthlyFolderViewUrl = normalizedFolders.monthlyFolderViewUrl.length > 0;
+
+  if (hasMonthlyFolderId !== hasMonthlyFolderViewUrl) {
+    throw new Error(
+      `${operationName} requires folder metadata to include both monthly folder fields or neither one.`,
     );
   }
 
@@ -453,9 +462,9 @@ function validateFolders(
       allReceiptsFolderViewUrl: RECEIPT_VIEW_URL_SCHEMA.parse(
         normalizedFolders.allReceiptsFolderViewUrl,
       ),
-      monthlyFolderViewUrl: RECEIPT_VIEW_URL_SCHEMA.parse(
-        normalizedFolders.monthlyFolderViewUrl,
-      ),
+      monthlyFolderViewUrl: hasMonthlyFolderViewUrl
+        ? RECEIPT_VIEW_URL_SCHEMA.parse(normalizedFolders.monthlyFolderViewUrl)
+        : "",
     };
   } catch {
     throw new Error(

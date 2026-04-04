@@ -585,6 +585,75 @@ describe("createMonthlyExpensesApiHandler", () => {
     expect(response.ended).toBe(true);
   });
 
+  it("passes shared folder metadata to save even when monthly folder metadata is blank", async () => {
+    const database = {} as TursoDatabase;
+    const save = jest.fn().mockResolvedValue({
+      id: "monthly-expenses-file-id",
+      month: "2026-03",
+      name: "gastos-mensuales-2026-marzo.json",
+      viewUrl: null,
+    });
+    const handler = createMonthlyExpensesApiHandler({
+      load: jest.fn(),
+      getDatabase: jest.fn().mockReturnValue(database),
+      getUserSubject: jest.fn().mockResolvedValue("google-user-123"),
+      save,
+    });
+
+    const request = {
+      body: {
+        items: [
+          {
+            currency: "ARS",
+            description: "Internet",
+            folders: {
+              allReceiptsFolderId: "receipt-folder-id",
+              allReceiptsFolderViewUrl:
+                "https://drive.google.com/drive/folders/receipt-folder-id",
+              monthlyFolderId: "",
+              monthlyFolderViewUrl: "",
+            },
+            id: "expense-1",
+            occurrencesPerMonth: 1,
+            subtotal: 45,
+          },
+        ],
+        month: "2026-03",
+      },
+      method: "POST",
+    } as NextApiRequest;
+    const response = createMockResponse();
+
+    await handler(request, response);
+
+    expect(save).toHaveBeenCalledWith({
+      command: {
+        items: [
+          {
+            currency: "ARS",
+            description: "Internet",
+            folders: {
+              allReceiptsFolderId: "receipt-folder-id",
+              allReceiptsFolderViewUrl:
+                "https://drive.google.com/drive/folders/receipt-folder-id",
+              monthlyFolderId: "",
+              monthlyFolderViewUrl: "",
+            },
+            id: "expense-1",
+            occurrencesPerMonth: 1,
+            subtotal: 45,
+          },
+        ],
+        month: "2026-03",
+      },
+      database,
+      request,
+      userSubject: "google-user-123",
+    });
+    expect(response.statusCode).toBe(204);
+    expect(response.ended).toBe(true);
+  });
+
   it("returns 401 when Google authentication is missing", async () => {
     const errorSpy = jest.spyOn(console, "error").mockImplementation(() => undefined);
     const handler = createMonthlyExpensesApiHandler({

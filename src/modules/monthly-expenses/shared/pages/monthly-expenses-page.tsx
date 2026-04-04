@@ -385,7 +385,30 @@ function toEditableReceipts(
   }));
 }
 
-function toEditableRows(
+function getPreferredFolderField(
+  primaryValue: string | undefined,
+  fallbackValue: string | undefined,
+): string {
+  if (primaryValue !== undefined) {
+    return primaryValue;
+  }
+
+  return fallbackValue ?? "";
+}
+
+function getPreferredFolderStatus<TStatus>(
+  primaryId: string | undefined,
+  primaryStatus: TStatus | undefined,
+  fallbackStatus: TStatus | undefined,
+): TStatus | undefined {
+  if (primaryId !== undefined) {
+    return primaryStatus;
+  }
+
+  return fallbackStatus;
+}
+
+export function toEditableRows(
   document: MonthlyExpensesDocumentResult,
 ): MonthlyExpensesEditableRow[] {
   return document.items.map((item) => ({
@@ -408,14 +431,19 @@ function toEditableRows(
             ? formatEditableNumber(item.occurrencesPerMonth)
             : "0",
         }),
-    allReceiptsFolderId:
-      item.folders?.allReceiptsFolderId ?? item.receipts?.[0]?.allReceiptsFolderId ?? "",
-    allReceiptsFolderStatus:
-      item.folders?.allReceiptsFolderStatus ?? item.receipts?.[0]?.allReceiptsFolderStatus,
-    allReceiptsFolderViewUrl:
-      item.folders?.allReceiptsFolderViewUrl ??
-      item.receipts?.[0]?.allReceiptsFolderViewUrl ??
-      "",
+    allReceiptsFolderId: getPreferredFolderField(
+      item.folders?.allReceiptsFolderId,
+      item.receipts?.[0]?.allReceiptsFolderId,
+    ),
+    allReceiptsFolderStatus: getPreferredFolderStatus(
+      item.folders?.allReceiptsFolderId,
+      item.folders?.allReceiptsFolderStatus,
+      item.receipts?.[0]?.allReceiptsFolderStatus,
+    ),
+    allReceiptsFolderViewUrl: getPreferredFolderField(
+      item.folders?.allReceiptsFolderViewUrl,
+      item.receipts?.[0]?.allReceiptsFolderViewUrl,
+    ),
     ...(item.loan
       ? {
           loanPaidInstallments: item.loan.paidInstallments,
@@ -449,12 +477,19 @@ function toEditableRows(
     receiptSharePhoneDigits: item.receiptSharePhoneDigits?.trim() ?? "",
     requiresReceiptShare: item.requiresReceiptShare === true,
     receipts: toEditableReceipts(item.receipts),
-    monthlyFolderId:
-      item.folders?.monthlyFolderId ?? item.receipts?.[0]?.monthlyFolderId ?? "",
-    monthlyFolderStatus:
-      item.folders?.monthlyFolderStatus ?? item.receipts?.[0]?.monthlyFolderStatus,
-    monthlyFolderViewUrl:
-      item.folders?.monthlyFolderViewUrl ?? item.receipts?.[0]?.monthlyFolderViewUrl ?? "",
+    monthlyFolderId: getPreferredFolderField(
+      item.folders?.monthlyFolderId,
+      item.receipts?.[0]?.monthlyFolderId,
+    ),
+    monthlyFolderStatus: getPreferredFolderStatus(
+      item.folders?.monthlyFolderId,
+      item.folders?.monthlyFolderStatus,
+      item.receipts?.[0]?.monthlyFolderStatus,
+    ),
+    monthlyFolderViewUrl: getPreferredFolderField(
+      item.folders?.monthlyFolderViewUrl,
+      item.receipts?.[0]?.monthlyFolderViewUrl,
+    ),
     startMonth: item.loan?.startMonth ?? "",
     subtotal: formatEditableNumber(item.subtotal),
     total: item.total.toFixed(2),
@@ -666,6 +701,26 @@ function normalizeEditableRows(
   }));
 }
 
+export function copyMonthlyExpenseTemplatesToMonth(
+  month: string,
+  rows: MonthlyExpensesEditableRow[],
+): MonthlyExpensesEditableRow[] {
+  return normalizeEditableRows(
+    month,
+    rows.map((row) => ({
+      ...row,
+      allReceiptsFolderStatus: undefined,
+      id: createExpenseRowId(),
+      manualCoveredPayments: "0",
+      monthlyFolderId: "",
+      monthlyFolderStatus: undefined,
+      monthlyFolderViewUrl: "",
+      receiptShareStatus: "",
+      receipts: [],
+    })),
+  );
+}
+
 function createClosedExpenseSheetState(): ExpenseSheetState {
   return {
     draft: null,
@@ -808,7 +863,46 @@ function getChangedExpenseFields(
   return changedFields;
 }
 
-function toSaveMonthlyExpensesCommand(
+function buildRowFoldersPayload(
+  row: MonthlyExpensesEditableRow,
+): SaveMonthlyExpensesCommand["items"][number]["folders"] | undefined {
+  const allReceiptsFolderId = getPreferredFolderField(
+    row.allReceiptsFolderId,
+    row.receipts[0]?.allReceiptsFolderId,
+  ).trim();
+  const allReceiptsFolderViewUrl = getPreferredFolderField(
+    row.allReceiptsFolderViewUrl,
+    row.receipts[0]?.allReceiptsFolderViewUrl,
+  ).trim();
+  const monthlyFolderId = getPreferredFolderField(
+    row.monthlyFolderId,
+    row.receipts[0]?.monthlyFolderId,
+  ).trim();
+  const monthlyFolderViewUrl = getPreferredFolderField(
+    row.monthlyFolderViewUrl,
+    row.receipts[0]?.monthlyFolderViewUrl,
+  ).trim();
+
+  if (!allReceiptsFolderId || !allReceiptsFolderViewUrl) {
+    return undefined;
+  }
+
+  const hasMonthlyFolderId = monthlyFolderId.length > 0;
+  const hasMonthlyFolderViewUrl = monthlyFolderViewUrl.length > 0;
+
+  if (hasMonthlyFolderId !== hasMonthlyFolderViewUrl) {
+    return undefined;
+  }
+
+  return {
+    allReceiptsFolderId,
+    allReceiptsFolderViewUrl,
+    monthlyFolderId,
+    monthlyFolderViewUrl,
+  };
+}
+
+export function toSaveMonthlyExpensesCommand(
   state: MonthlyExpensesFormState,
 ): SaveMonthlyExpensesCommand {
   return {
@@ -838,17 +932,9 @@ function toSaveMonthlyExpensesCommand(
       ...(isReceiptShareStatus(row.receiptShareStatus)
         ? { receiptShareStatus: row.receiptShareStatus }
         : {}),
-      ...((row.allReceiptsFolderId.trim().length > 0 &&
-        row.allReceiptsFolderViewUrl.trim().length > 0 &&
-        row.monthlyFolderId.trim().length > 0 &&
-        row.monthlyFolderViewUrl.trim().length > 0)
+      ...(buildRowFoldersPayload(row)
         ? {
-            folders: {
-              allReceiptsFolderId: row.allReceiptsFolderId.trim(),
-              allReceiptsFolderViewUrl: row.allReceiptsFolderViewUrl.trim(),
-              monthlyFolderId: row.monthlyFolderId.trim(),
-              monthlyFolderViewUrl: row.monthlyFolderViewUrl.trim(),
-            },
+            folders: buildRowFoldersPayload(row),
           }
         : {}),
       ...(row.receipts.length > 0
@@ -1175,20 +1261,21 @@ export default function MonthlyExpensesPage({
         return;
       }
 
-      const copiedRows = normalizeEditableRows(
+      const copiedRows = copyMonthlyExpenseTemplatesToMonth(
         formState.month,
         toEditableRows(sourceDocument),
       );
 
-      updateFormState((currentState) => ({
-        ...currentState,
-        error: null,
-        rows: copiedRows,
-      }));
+      const wasSaved = await persistMonthlyExpensesRows(copiedRows, {
+        loading: `Copiando gastos desde ${copySourceMonth}...`,
+        success: `Copiamos y guardamos la planilla de ${copySourceMonth} en ${formState.month}.`,
+      });
+
+      if (!wasSaved) {
+        return;
+      }
+
       setExpenseSheetState(createClosedExpenseSheetState());
-      toast.info(
-        `Copiamos la planilla de ${copySourceMonth}. Revisá y guardá para persistir ${formState.month}.`,
-      );
     } catch (error) {
       updateFormState((currentState) => ({
         ...currentState,

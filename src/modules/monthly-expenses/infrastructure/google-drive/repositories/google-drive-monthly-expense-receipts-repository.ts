@@ -198,18 +198,19 @@ export class GoogleDriveMonthlyExpenseReceiptsRepository
     input: VerifyMonthlyExpenseFoldersInput,
   ): Promise<MonthlyExpenseFoldersDriveStatus> {
     const allReceiptsFolderId = input.allReceiptsFolderId.trim();
-    const monthlyFolderId = input.monthlyFolderId.trim();
+    const monthlyFolderId = input.monthlyFolderId?.trim() ?? "";
 
-    if (!allReceiptsFolderId || !monthlyFolderId) {
+    if (!allReceiptsFolderId) {
       throw new Error(
-        "google-drive-monthly-expense-receipts-repository:verifyFolders requires folder ids.",
+        "google-drive-monthly-expense-receipts-repository:verifyFolders requires an all-receipts folder id.",
       );
     }
 
-    const [allReceiptsFolderStatus, monthlyFolderStatus] = await Promise.all([
-      this.getDriveResourceStatus(allReceiptsFolderId),
-      this.getDriveResourceStatus(monthlyFolderId),
-    ]);
+    const allReceiptsFolderStatus =
+      await this.getDriveResourceStatus(allReceiptsFolderId);
+    const monthlyFolderStatus = monthlyFolderId
+      ? await this.getDriveResourceStatus(monthlyFolderId)
+      : undefined;
 
     return {
       allReceiptsFolderStatus,

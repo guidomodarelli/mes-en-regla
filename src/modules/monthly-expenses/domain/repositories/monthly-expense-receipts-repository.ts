@@ -28,18 +28,18 @@ export interface VerifyMonthlyExpenseReceiptInput {
 
 export interface VerifyMonthlyExpenseFoldersInput {
   allReceiptsFolderId: string;
-  monthlyFolderId: string;
+  monthlyFolderId?: string;
 }
 
 export interface MonthlyExpenseReceiptDriveStatus {
   allReceiptsFolderStatus: MonthlyExpenseDriveResourceStatus;
   fileStatus: MonthlyExpenseDriveResourceStatus;
-  monthlyFolderStatus: MonthlyExpenseDriveResourceStatus;
+  monthlyFolderStatus?: MonthlyExpenseDriveResourceStatus;
 }
 
 export interface MonthlyExpenseFoldersDriveStatus {
   allReceiptsFolderStatus: MonthlyExpenseDriveResourceStatus;
-  monthlyFolderStatus: MonthlyExpenseDriveResourceStatus;
+  monthlyFolderStatus?: MonthlyExpenseDriveResourceStatus;
 }
 
 export interface DeleteMonthlyExpenseReceiptInput {

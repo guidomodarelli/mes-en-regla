@@ -23,6 +23,17 @@ interface GetMonthlyExpensesDocumentDependencies {
   repository: MonthlyExpensesRepository;
 }
 
+function getPreferredFolderId(
+  primaryFolderId: string | undefined,
+  fallbackFolderId: string | undefined,
+): string | undefined {
+  if (primaryFolderId !== undefined) {
+    return primaryFolderId;
+  }
+
+  return fallbackFolderId;
+}
+
 async function verifyReceiptStatusesByFileId({
   document,
   receiptsRepository,
@@ -39,7 +50,7 @@ async function verifyReceiptStatusesByFileId({
     {
       allReceiptsFolderStatus: "normal" | "trashed" | "missing";
       fileStatus: "normal" | "trashed" | "missing";
-      monthlyFolderStatus: "normal" | "trashed" | "missing";
+      monthlyFolderStatus?: "normal" | "trashed" | "missing";
     }
   > = {};
 
@@ -75,24 +86,28 @@ async function verifyFolderStatusesByItemId({
     string,
     {
       allReceiptsFolderStatus: "normal" | "trashed" | "missing";
-      monthlyFolderStatus: "normal" | "trashed" | "missing";
+      monthlyFolderStatus?: "normal" | "trashed" | "missing";
     }
   > = {};
 
   for (const item of document.items) {
-    const allReceiptsFolderId =
-      item.folders?.allReceiptsFolderId ?? item.receipts[0]?.allReceiptsFolderId;
-    const monthlyFolderId =
-      item.folders?.monthlyFolderId ?? item.receipts[0]?.monthlyFolderId;
+    const allReceiptsFolderId = getPreferredFolderId(
+      item.folders?.allReceiptsFolderId,
+      item.receipts[0]?.allReceiptsFolderId,
+    );
+    const monthlyFolderId = getPreferredFolderId(
+      item.folders?.monthlyFolderId,
+      item.receipts[0]?.monthlyFolderId,
+    );
 
-    if (!allReceiptsFolderId || !monthlyFolderId) {
+    if (!allReceiptsFolderId) {
       continue;
     }
 
     try {
       statusesByItemId[item.id] = await receiptsRepository.verifyFolders({
         allReceiptsFolderId,
-        monthlyFolderId,
+        monthlyFolderId: monthlyFolderId ?? "",
       });
     } catch {
       // Keep document loading resilient even if Drive status verification fails.
