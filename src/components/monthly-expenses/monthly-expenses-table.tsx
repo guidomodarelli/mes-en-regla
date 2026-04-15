@@ -330,7 +330,7 @@ interface LoanSortColumnHeaderProps {
 
 interface ReceiptDeleteConfirmButtonProps {
   actionDisabled: boolean;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   receiptFileName: string;
 }
 
@@ -415,12 +415,6 @@ function PaymentLinkActionsMenu({
       </AlertDialogContent>
     </AlertDialog>
   );
-}
-
-interface ReceiptDeleteConfirmButtonProps {
-  actionDisabled: boolean;
-  onConfirm: () => void | Promise<void>;
-  receiptFileName: string;
 }
 
 function ReceiptDeleteConfirmButton({
