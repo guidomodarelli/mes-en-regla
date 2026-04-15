@@ -710,7 +710,7 @@ export function copyMonthlyExpenseTemplatesToMonth(
   month: string,
   rows: MonthlyExpensesEditableRow[],
 ): MonthlyExpensesEditableRow[] {
-  return normalizeEditableRows(
+  const normalizedRowsToCopy = normalizeEditableRows(
     month,
     rows.map((row) => ({
       ...row,
@@ -723,6 +723,10 @@ export function copyMonthlyExpenseTemplatesToMonth(
       receiptShareStatus: "",
       receipts: [],
     })),
+  );
+
+  return normalizedRowsToCopy.filter(
+    (row) => !row.isLoan || row.loanRemainingInstallments !== 0,
   );
 }
 
@@ -1416,6 +1420,13 @@ export default function MonthlyExpensesPage({
         formState.month,
         toEditableRows(sourceDocument),
       );
+
+      if (copiedRows.length === 0) {
+        toast.warning(
+          "El mes seleccionado no tiene deudas vigentes para copiar.",
+        );
+        return;
+      }
 
       const wasSaved = await persistMonthlyExpensesRows(copiedRows, {
         loading: `Copiando gastos desde ${copySourceMonth}...`,

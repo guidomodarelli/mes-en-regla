@@ -2,6 +2,7 @@ import { createEmptyMonthlyExpensesDocumentResult } from "@/modules/monthly-expe
 import type { MonthlyExpenseItemResult } from "@/modules/monthly-expenses/application/results/monthly-expenses-document-result";
 
 import {
+  copyMonthlyExpenseTemplatesToMonth,
   toEditableRows,
   toSaveMonthlyExpensesCommand,
 } from "./monthly-expenses-page";
@@ -161,5 +162,33 @@ describe("monthly expenses page mappers", () => {
     });
 
     expect(command.items[0]?.folders).toBeUndefined();
+  });
+
+  it("does not copy loans that are no longer active in the destination month", () => {
+    const sourceDocument = createEmptyMonthlyExpensesDocumentResult("2026-03");
+    sourceDocument.items = [
+      {
+        currency: "ARS",
+        description: "Prestamo",
+        id: "expense-1",
+        loan: {
+          endMonth: "2026-04",
+          installmentCount: 2,
+          paidInstallments: 1,
+          startMonth: "2026-03",
+        },
+        occurrencesPerMonth: 1,
+        receipts: [],
+        subtotal: 100,
+        total: 100,
+      },
+    ];
+
+    const copiedRows = copyMonthlyExpenseTemplatesToMonth(
+      "2026-04",
+      toEditableRows(sourceDocument),
+    );
+
+    expect(copiedRows).toHaveLength(0);
   });
 });

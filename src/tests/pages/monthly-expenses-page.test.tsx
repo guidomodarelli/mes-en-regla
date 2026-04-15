@@ -2540,6 +2540,83 @@ describe("MonthlyExpensesPage", () => {
     });
   });
 
+  it("shows a warning and skips persistence when all copied debts have zero remaining installments", async () => {
+    const user = userEvent.setup();
+    const fetchMock = createMonthlyExpensesFetchMock({
+      monthlyDocument: {
+        items: [
+          {
+            currency: "ARS",
+            description: "Tarjeta finalizada",
+            id: "expense-source-1",
+            loan: {
+              endMonth: "2026-02",
+              installmentCount: 12,
+              lenderId: "lender-1",
+              lenderName: "Banco",
+              paidInstallments: 12,
+              startMonth: "2025-03",
+            },
+            occurrencesPerMonth: 1,
+            subtotal: 12000,
+            total: 12000,
+          },
+        ],
+        month: "2026-02",
+      },
+    });
+
+    mockedUseSession.mockReturnValue({
+      data: {
+        expires: "2099-01-01T00:00:00.000Z",
+        user: {
+          email: "gus@example.com",
+          name: "Gus",
+        },
+      },
+      status: "authenticated",
+      update: jest.fn(),
+    } as ReturnType<typeof useSession>);
+    global.fetch = fetchMock as typeof fetch;
+
+    renderWithProviders(
+      <MonthlyExpensesPage
+        {...basePageProps}
+        initialCopyableMonths={{
+          defaultSourceMonth: "2026-02",
+          sourceMonths: ["2026-02", "2026-01"],
+          targetMonth: "2026-03",
+        }}
+        initialDocument={{
+          items: [],
+          month: "2026-03",
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Copia de" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/storage/monthly-expenses?month=2026-02",
+        expect.any(Object),
+      );
+    });
+
+    expect(mockedToast.warning).toHaveBeenCalledWith(
+      "El mes seleccionado no tiene deudas vigentes para copiar.",
+    );
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      "/api/storage/monthly-expenses",
+      expect.objectContaining({
+        method: "POST",
+      }),
+    );
+    expect(
+      screen.queryByText("Tarjeta finalizada"),
+    ).not.toBeInTheDocument();
+  });
+
   it("preserves shared folder metadata when copying a month without monthly folder metadata", async () => {
     const user = userEvent.setup();
     const sharedReceiptsFolderViewUrl =
@@ -2784,6 +2861,104 @@ describe("MonthlyExpensesPage", () => {
     );
     expect(copiedRows[0]?.monthlyFolderId).toBe("");
     expect(copiedRows[0]?.monthlyFolderViewUrl).toBe("");
+  });
+
+  it("filters out loans with zero remaining installments when copying rows", () => {
+    const copiedRows = copyMonthlyExpenseTemplatesToMonth("2026-03", [
+      {
+        allReceiptsFolderId: "",
+        allReceiptsFolderViewUrl: "",
+        currency: "ARS",
+        description: "Deuda terminada",
+        id: "finished-loan",
+        installmentCount: "12",
+        isLoan: true,
+        lenderId: "lender-1",
+        lenderName: "Banco",
+        loanEndMonth: "2026-02",
+        loanPaidInstallments: 12,
+        loanProgress: "12 de 12 cuotas pagadas",
+        loanRemainingInstallments: 0,
+        loanTotalInstallments: 12,
+        manualCoveredPayments: "0",
+        monthlyFolderId: "",
+        monthlyFolderViewUrl: "",
+        occurrencesPerMonth: "1",
+        paymentLink: "",
+        receiptShareMessage: "",
+        receiptSharePhoneDigits: "",
+        receiptShareStatus: "",
+        requiresReceiptShare: false,
+        receipts: [],
+        startMonth: "2025-03",
+        subtotal: "1000",
+        total: "1000.00",
+      },
+      {
+        allReceiptsFolderId: "",
+        allReceiptsFolderViewUrl: "",
+        currency: "ARS",
+        description: "Deuda activa",
+        id: "active-loan",
+        installmentCount: "12",
+        isLoan: true,
+        lenderId: "lender-1",
+        lenderName: "Banco",
+        loanEndMonth: "2026-12",
+        loanPaidInstallments: 2,
+        loanProgress: "2 de 12 cuotas pagadas",
+        loanRemainingInstallments: 10,
+        loanTotalInstallments: 12,
+        manualCoveredPayments: "0",
+        monthlyFolderId: "",
+        monthlyFolderViewUrl: "",
+        occurrencesPerMonth: "1",
+        paymentLink: "",
+        receiptShareMessage: "",
+        receiptSharePhoneDigits: "",
+        receiptShareStatus: "",
+        requiresReceiptShare: false,
+        receipts: [],
+        startMonth: "2026-01",
+        subtotal: "2000",
+        total: "2000.00",
+      },
+      {
+        allReceiptsFolderId: "",
+        allReceiptsFolderViewUrl: "",
+        currency: "USD",
+        description: "Servicio",
+        id: "regular-expense",
+        installmentCount: "",
+        isLoan: false,
+        lenderId: "",
+        lenderName: "",
+        loanEndMonth: "",
+        loanPaidInstallments: null,
+        loanProgress: "",
+        loanRemainingInstallments: null,
+        loanTotalInstallments: null,
+        manualCoveredPayments: "0",
+        monthlyFolderId: "",
+        monthlyFolderViewUrl: "",
+        occurrencesPerMonth: "1",
+        paymentLink: "",
+        receiptShareMessage: "",
+        receiptSharePhoneDigits: "",
+        receiptShareStatus: "",
+        requiresReceiptShare: false,
+        receipts: [],
+        startMonth: "",
+        subtotal: "20",
+        total: "20.00",
+      },
+    ]);
+
+    expect(copiedRows).toHaveLength(2);
+    expect(copiedRows.map((row) => row.description)).toEqual([
+      "Deuda activa",
+      "Servicio",
+    ]);
   });
 
   it("opens a modal to create a new expense, without showing an opening toast", async () => {
