@@ -96,7 +96,6 @@ const SORTABLE_COLUMN_IDS = new Set([
   "subtotal",
   "occurrencesPerMonth",
   "total",
-  "ars",
   "usd",
   "paymentLink",
   "receiptShareStatus",
@@ -112,7 +111,6 @@ const PERSISTABLE_COLUMN_VISIBILITY_IDS = new Set([
   "subtotal",
   "occurrencesPerMonth",
   "total",
-  "ars",
   "usd",
   "paymentLink",
   "receiptShareStatus",
@@ -1140,19 +1138,78 @@ function getConvertedAmountForCurrency({
   rowCurrency: MonthlyExpenseCurrency;
   total: number;
 }): number | null {
-  if (!exchangeRateSnapshot || !Number.isFinite(total)) {
+  if (!Number.isFinite(total)) {
     return null;
   }
 
   if (currency === "ARS") {
-    return rowCurrency === "ARS"
-      ? total
-      : total * exchangeRateSnapshot.solidarityRate;
+    if (rowCurrency === "ARS") {
+      return total;
+    }
+
+    if (!exchangeRateSnapshot) {
+      return null;
+    }
+
+    return total * exchangeRateSnapshot.solidarityRate;
   }
 
-  return rowCurrency === "USD"
-    ? total
-    : total / exchangeRateSnapshot.solidarityRate;
+  if (rowCurrency === "USD") {
+    return total;
+  }
+
+  if (!exchangeRateSnapshot) {
+    return null;
+  }
+
+  return total / exchangeRateSnapshot.solidarityRate;
+}
+
+function formatArsWithUsdSecondary({
+  exchangeRateSnapshot,
+  rowCurrency,
+  value,
+}: {
+  exchangeRateSnapshot: MonthlyExpensesTableProps["exchangeRateSnapshot"];
+  rowCurrency: MonthlyExpenseCurrency;
+  value: string;
+}) {
+  if (rowCurrency === "ARS") {
+    return formatCurrencyAmount("ARS", value);
+  }
+
+  const arsAmount = getConvertedAmountForCurrency({
+    currency: "ARS",
+    exchangeRateSnapshot,
+    rowCurrency,
+    total: Number(value),
+  });
+
+  return (
+    <span className={styles.convertedCurrencyValue}>
+      <span>{formatConvertedAmount("ARS", arsAmount)}</span>
+      <span className={styles.convertedCurrencySecondaryValue}>
+        ({formatCurrencyAmount("USD", value)})
+      </span>
+    </span>
+  );
+}
+
+function getArsComparableAmount({
+  exchangeRateSnapshot,
+  rowCurrency,
+  value,
+}: {
+  exchangeRateSnapshot: MonthlyExpensesTableProps["exchangeRateSnapshot"];
+  rowCurrency: MonthlyExpenseCurrency;
+  value: string;
+}): number | null {
+  return getConvertedAmountForCurrency({
+    currency: "ARS",
+    exchangeRateSnapshot,
+    rowCurrency,
+    total: Number(value),
+  });
 }
 
 function getConvertedTotalAmount({
@@ -1853,14 +1910,26 @@ export function MonthlyExpensesTable({
       {
         accessorKey: "subtotal",
         cell: ({ row }) =>
-          formatCurrencyAmount(row.original.currency, row.original.subtotal),
+          formatArsWithUsdSecondary({
+            exchangeRateSnapshot,
+            rowCurrency: row.original.currency,
+            value: row.original.subtotal,
+          }),
         header: getSortableHeader("Subtotal"),
         meta: { label: "Subtotal" },
         sortingFn: (rowA, rowB) =>
           compareValuesKeepingInvalidLast({
             compareValidValues: (leftValue, rightValue) => leftValue - rightValue,
-            leftValue: Number(rowA.original.subtotal),
-            rightValue: Number(rowB.original.subtotal),
+            leftValue: getArsComparableAmount({
+              exchangeRateSnapshot,
+              rowCurrency: rowA.original.currency,
+              value: rowA.original.subtotal,
+            }),
+            rightValue: getArsComparableAmount({
+              exchangeRateSnapshot,
+              rowCurrency: rowB.original.currency,
+              value: rowB.original.subtotal,
+            }),
             sortDirection: getSortDirection("subtotal"),
           }),
       },
@@ -1880,32 +1949,13 @@ export function MonthlyExpensesTable({
         accessorKey: "total",
         cell: ({ row }) => (
           <span className={styles.totalAmount}>
-            {formatCurrencyAmount(row.original.currency, row.original.total)}
+            {formatArsWithUsdSecondary({
+              exchangeRateSnapshot,
+              rowCurrency: row.original.currency,
+              value: row.original.total,
+            })}
           </span>
         ),
-        header: getSortableHeader("Total"),
-        meta: { label: "Total" },
-        sortingFn: (rowA, rowB) =>
-          compareValuesKeepingInvalidLast({
-            compareValidValues: (leftValue, rightValue) => leftValue - rightValue,
-            leftValue: Number(rowA.original.total),
-            rightValue: Number(rowB.original.total),
-            sortDirection: getSortDirection("total"),
-          }),
-      },
-      {
-        accessorKey: "ars",
-        cell: ({ row }) => {
-          const total = Number(row.original.total);
-          const arsAmount = getConvertedAmountForCurrency({
-            currency: "ARS",
-            exchangeRateSnapshot,
-            rowCurrency: row.original.currency,
-            total,
-          });
-
-          return formatConvertedAmount("ARS", arsAmount);
-        },
         footer: ({ table }) => {
           const arsTotal = getConvertedTotalAmount({
             currency: "ARS",
@@ -1919,29 +1969,23 @@ export function MonthlyExpensesTable({
             </span>
           );
         },
-        header: getSortableHeader("ARS"),
-        meta: { label: "ARS" },
-        sortingFn: (rowA, rowB) => {
-          const leftAmount = getConvertedAmountForCurrency({
-            currency: "ARS",
-            exchangeRateSnapshot,
-            rowCurrency: rowA.original.currency,
-            total: Number(rowA.original.total),
-          });
-          const rightAmount = getConvertedAmountForCurrency({
-            currency: "ARS",
-            exchangeRateSnapshot,
-            rowCurrency: rowB.original.currency,
-            total: Number(rowB.original.total),
-          });
-
-          return compareValuesKeepingInvalidLast({
+        header: getSortableHeader("Total"),
+        meta: { label: "Total" },
+        sortingFn: (rowA, rowB) =>
+          compareValuesKeepingInvalidLast({
             compareValidValues: (leftValue, rightValue) => leftValue - rightValue,
-            leftValue: leftAmount,
-            rightValue: rightAmount,
-            sortDirection: getSortDirection("ars"),
-          });
-        },
+            leftValue: getArsComparableAmount({
+              exchangeRateSnapshot,
+              rowCurrency: rowA.original.currency,
+              value: rowA.original.total,
+            }),
+            rightValue: getArsComparableAmount({
+              exchangeRateSnapshot,
+              rowCurrency: rowB.original.currency,
+              value: rowB.original.total,
+            }),
+            sortDirection: getSortDirection("total"),
+          }),
       },
       {
         accessorKey: "usd",

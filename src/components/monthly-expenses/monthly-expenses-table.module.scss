@@ -470,6 +470,18 @@
   font-variant-numeric: normal;
 }
 
+.convertedCurrencyValue {
+  display: inline-grid;
+  gap: 0.05rem;
+  line-height: 1.1;
+}
+
+.convertedCurrencySecondaryValue {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .totalFooterValue {
   display: inline-flex;
   font-variant-numeric: tabular-nums;

@@ -1020,7 +1020,7 @@ describe("MonthlyExpensesPage", () => {
     ]);
   });
 
-  it("sorts ARS numerically using the monthly snapshot conversion", async () => {
+  it("sorts total numerically in ARS using the monthly snapshot conversion", async () => {
     const user = userEvent.setup();
 
     renderWithProviders(
@@ -1065,7 +1065,7 @@ describe("MonthlyExpensesPage", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Ordenar ARS" }));
+    await user.click(screen.getByRole("button", { name: "Ordenar Total" }));
 
     expect(getMonthlyExpensesDescriptionsOrder()).toEqual([
       "Luz",
@@ -1073,7 +1073,7 @@ describe("MonthlyExpensesPage", () => {
       "Internet",
     ]);
 
-    await user.click(screen.getByRole("button", { name: "Ordenar ARS" }));
+    await user.click(screen.getByRole("button", { name: "Ordenar Total" }));
 
     expect(getMonthlyExpensesDescriptionsOrder()).toEqual([
       "Internet",
@@ -1144,7 +1144,7 @@ describe("MonthlyExpensesPage", () => {
     ]);
   });
 
-  it("renders ARS and USD totals in the table footer", () => {
+  it("renders ARS total in Total footer and keeps USD footer", () => {
     renderWithProviders(
       <MonthlyExpensesPage
         {...basePageProps}
@@ -6022,7 +6022,7 @@ describe("MonthlyExpensesPage", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("renders ARS and USD converted columns using the monthly snapshot", () => {
+  it("renders converted amounts in subtotal and total while keeping the USD column", () => {
     renderWithProviders(
       <MonthlyExpensesPage
         {...basePageProps}
@@ -6057,14 +6057,19 @@ describe("MonthlyExpensesPage", () => {
       />,
     );
 
-    expect(screen.getByRole("columnheader", { name: "ARS" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("columnheader", { name: "ARS" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "USD" })).toBeInTheDocument();
     expect(screen.getByText(/^Dólar oficial:/i)).toBeInTheDocument();
     expect(screen.getByText("$ 1.200")).toBeInTheDocument();
     expect(screen.getByText(/^Dólar solidario:/i)).toBeInTheDocument();
     expect(screen.getByText("$ 1.476")).toBeInTheDocument();
-    expect(screen.getAllByText("$ 14.760,00").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("$ 14.760,00").length).toBeGreaterThanOrEqual(3);
     expect(screen.getAllByText(/US\$\s*10,00/).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText(/\(US\$\s*10,00\)/).length).toBeGreaterThanOrEqual(
+      2,
+    );
   });
 
   it("renders the Link column after USD and opens payment links in a new tab", async () => {
