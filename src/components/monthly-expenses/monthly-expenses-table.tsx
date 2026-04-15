@@ -2175,6 +2175,7 @@ export function MonthlyExpensesTable({
         accessorFn: (row) => row.receipts[0]?.fileViewUrl ?? "",
         cell: ({ row }) => {
           const receiptsCount = row.original.receipts.length;
+          const receiptCountLabel = receiptsCount === 1 ? "comprobante" : "comprobantes";
           const { coveredPaymentsByReceipts, requiredPayments } = getPaymentProgress(
             row.original,
           );
@@ -2205,7 +2206,7 @@ export function MonthlyExpensesTable({
                       type="button"
                       variant="link"
                     >
-                      {`📎 ${receiptsCount} comprobantes`}
+                      {`📎 ${receiptsCount} ${receiptCountLabel}`}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent align="start" className={styles.extraReceiptsPopover}>

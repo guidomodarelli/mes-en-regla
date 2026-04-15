@@ -2167,7 +2167,7 @@ describe("MonthlyExpensesPage", () => {
 
     await user.click(
       screen.getByRole("button", {
-        name: /1 comprobantes/i,
+        name: /1 comprobante/i,
       }),
     );
 
@@ -6369,7 +6369,7 @@ describe("MonthlyExpensesPage", () => {
 
     await user.click(
       screen.getByRole("button", {
-        name: /1 comprobantes/i,
+        name: /1 comprobante/i,
       }),
     );
 
@@ -6455,7 +6455,7 @@ describe("MonthlyExpensesPage", () => {
 
     await user.click(
       screen.getByRole("button", {
-        name: /1 comprobantes/i,
+        name: /1 comprobante/i,
       }),
     );
 
@@ -6734,7 +6734,7 @@ describe("MonthlyExpensesPage", () => {
 
     await user.click(
       screen.getByRole("button", {
-        name: /1 comprobantes/i,
+        name: /1 comprobante/i,
       }),
     );
 
