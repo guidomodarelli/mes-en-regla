@@ -1,5 +1,4 @@
 import {
-  useEffect,
   useId,
   useMemo,
   useRef,
@@ -173,14 +172,6 @@ export function ExpenseReceiptUploadDialog({
       fileInputRef.current.value = "";
     }
   }
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    resetDialogState();
-  }, [isOpen]);
 
   const handleDialogOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {

@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Info, X } from "lucide-react";
 import { useForm } from "react-hook-form";
-import { parsePhoneNumberFromString } from "libphonenumber-js";
-import { z } from "zod";
 
 import {
   Alert,
@@ -48,6 +46,11 @@ import {
 } from "./lender-picker";
 import { LoanInfoPopover } from "./loan-info-popover";
 import { PaymentFrequencyField } from "./payment-frequency-field";
+import {
+  validateOccurrencesPerMonth,
+  validateReceiptSharePhoneDigits,
+  validateSubtotalAmount,
+} from "./expense-edit-validation";
 import type { MonthlyExpensesEditableRow } from "./monthly-expenses-table";
 import styles from "./expense-sheet.module.scss";
 
@@ -96,22 +99,6 @@ type ExpenseFieldErrorMap = Partial<Record<ExpenseSheetFormFieldName, string>>;
 type ExpenseSheetFormValues = Record<ExpenseSheetFormFieldName, string>;
 
 const INSTALLMENT_COUNT_SUGGESTIONS = ["3", "6", "9", "12", "18", "24"];
-const RECEIPT_SHARE_PHONE_SCHEMA = z
-  .string()
-  .trim()
-  .min(1, "Completá el número de WhatsApp.")
-  .refine((value) => {
-    const phoneDigits = value.replace(/\D+/g, "");
-
-    if (!phoneDigits) {
-      return false;
-    }
-
-    const parsedPhone = parsePhoneNumberFromString(`+${phoneDigits}`);
-
-    return Boolean(parsedPhone?.isValid());
-  }, "Ingresá un número de WhatsApp internacional válido.")
-  .transform((value) => value.replace(/\D+/g, ""));
 
 function getFieldLabel(label: string, isChanged: boolean) {
   return (
@@ -226,12 +213,17 @@ function getFieldErrors(draft: MonthlyExpensesEditableRow): ExpenseFieldErrorMap
     fieldErrors.description = "Completá la descripción.";
   }
 
-  if (!Number.isFinite(subtotal) || subtotal <= 0) {
-    fieldErrors.subtotal = "Ingresá un subtotal mayor a 0.";
+  const subtotalValidationError = validateSubtotalAmount(subtotal);
+
+  if (subtotalValidationError) {
+    fieldErrors.subtotal = subtotalValidationError;
   }
 
-  if (!Number.isInteger(occurrencesPerMonth) || occurrencesPerMonth <= 0) {
-    fieldErrors.occurrencesPerMonth = "Ingresá una cantidad mayor a 0.";
+  const occurrencesValidationError =
+    validateOccurrencesPerMonth(occurrencesPerMonth);
+
+  if (occurrencesValidationError) {
+    fieldErrors.occurrencesPerMonth = occurrencesValidationError;
   }
 
   if (draft.isLoan && !draft.startMonth.trim()) {
@@ -243,14 +235,12 @@ function getFieldErrors(draft: MonthlyExpensesEditableRow): ExpenseFieldErrorMap
   }
 
   if (draft.requiresReceiptShare) {
-    const parsedPhone = RECEIPT_SHARE_PHONE_SCHEMA.safeParse(
+    const receiptSharePhoneValidationError = validateReceiptSharePhoneDigits(
       draft.receiptSharePhoneDigits,
     );
 
-    if (!parsedPhone.success) {
-      fieldErrors.receiptSharePhoneDigits =
-        parsedPhone.error.issues[0]?.message ??
-        "Ingresá un número de WhatsApp internacional válido.";
+    if (receiptSharePhoneValidationError) {
+      fieldErrors.receiptSharePhoneDigits = receiptSharePhoneValidationError;
     }
   }
 

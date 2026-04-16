@@ -85,6 +85,13 @@ import {
 import { LoanInfoPopover } from "./loan-info-popover";
 import type { LenderOption } from "./lender-picker";
 import {
+  normalizeReceiptSharePhoneDigits,
+  RECEIPT_SHARE_PHONE_REQUIRED_ERROR_MESSAGE,
+  validateOccurrencesPerMonth,
+  validateReceiptSharePhoneDigits,
+  validateSubtotalAmount,
+} from "./expense-edit-validation";
+import {
   getValidPaymentLink as getValidPaymentLinkUrl,
   PAYMENT_LINK_VALIDATION_ERROR_MESSAGE,
 } from "./payment-link";
@@ -341,6 +348,14 @@ interface PaymentLinkActionsMenuProps {
   onEdit: () => void;
 }
 
+interface QuickEditActionsMenuProps {
+  actionDisabled: boolean;
+  editActionLabel: string;
+  expenseDescription: string;
+  onEdit: () => void;
+  triggerAriaLabel: string;
+}
+
 function PaymentLinkActionsMenu({
   actionDisabled,
   expenseDescription,
@@ -414,6 +429,47 @@ function PaymentLinkActionsMenu({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  );
+}
+
+function QuickEditActionsMenu({
+  actionDisabled,
+  editActionLabel,
+  expenseDescription,
+  onEdit,
+  triggerAriaLabel,
+}: QuickEditActionsMenuProps) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const normalizedExpenseDescription = expenseDescription.trim() || "gasto";
+
+  return (
+    <DropdownMenu onOpenChange={setIsMenuOpen} open={isMenuOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          aria-label={`${triggerAriaLabel} para ${normalizedExpenseDescription}`}
+          className={styles.paymentLinkActionButton}
+          disabled={actionDisabled}
+          size="icon-sm"
+          type="button"
+          variant="ghost"
+        >
+          <MoreVertical aria-hidden="true" className={styles.paymentLinkIcon} />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem
+          onSelect={() => {
+            setIsMenuOpen(false);
+            window.setTimeout(() => {
+              onEdit();
+            }, 0);
+          }}
+        >
+          <Pencil aria-hidden="true" />
+          {editActionLabel}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -757,6 +813,19 @@ interface MonthlyExpensesTableProps {
     expenseId: string;
     paymentLink: string;
   }) => void | Promise<void>;
+  onUpdateExpenseOccurrencesPerMonth: (args: {
+    expenseId: string;
+    occurrencesPerMonth: number;
+  }) => void | Promise<void>;
+  onUpdateExpenseReceiptShare: (args: {
+    expenseId: string;
+    receiptShareMessage: string;
+    receiptSharePhoneDigits: string;
+  }) => void | Promise<void>;
+  onUpdateExpenseSubtotal: (args: {
+    expenseId: string;
+    subtotal: number;
+  }) => void | Promise<void>;
   onUpdateReceiptShareStatus: (args: {
     expenseId: string;
     receiptShareStatus: MonthlyExpenseReceiptShareStatus;
@@ -775,6 +844,23 @@ interface MonthlyExpensesTableProps {
 }
 
 interface PaymentLinkDialogState {
+  expenseDescription: string;
+  expenseId: string;
+  mode: "create" | "edit";
+}
+
+interface ExpenseSubtotalDialogState {
+  currency: MonthlyExpenseCurrency;
+  expenseDescription: string;
+  expenseId: string;
+}
+
+interface ExpenseOccurrencesDialogState {
+  expenseDescription: string;
+  expenseId: string;
+}
+
+interface ExpenseReceiptShareDialogState {
   expenseDescription: string;
   expenseId: string;
   mode: "create" | "edit";
@@ -1701,6 +1787,9 @@ export function MonthlyExpensesTable({
   onDeleteManualPaymentRecord,
   onEditManualPaymentRecord,
   onUpdatePaymentLink,
+  onUpdateExpenseOccurrencesPerMonth,
+  onUpdateExpenseReceiptShare,
+  onUpdateExpenseSubtotal,
   onUpdateReceiptShareStatus,
   onMonthChange,
   onUploadReceipt,
@@ -1729,6 +1818,21 @@ export function MonthlyExpensesTable({
     useState<PaymentLinkDialogState | null>(null);
   const [paymentLinkDraftValue, setPaymentLinkDraftValue] = useState("");
   const [paymentLinkDraftError, setPaymentLinkDraftError] =
+    useState<string | null>(null);
+  const [subtotalDialogState, setSubtotalDialogState] =
+    useState<ExpenseSubtotalDialogState | null>(null);
+  const [subtotalDraftValue, setSubtotalDraftValue] = useState("");
+  const [subtotalDraftError, setSubtotalDraftError] = useState<string | null>(null);
+  const [occurrencesDialogState, setOccurrencesDialogState] =
+    useState<ExpenseOccurrencesDialogState | null>(null);
+  const [occurrencesDraftValue, setOccurrencesDraftValue] = useState("");
+  const [occurrencesDraftError, setOccurrencesDraftError] =
+    useState<string | null>(null);
+  const [receiptShareDialogState, setReceiptShareDialogState] =
+    useState<ExpenseReceiptShareDialogState | null>(null);
+  const [receiptSharePhoneDraftValue, setReceiptSharePhoneDraftValue] = useState("");
+  const [receiptShareMessageDraftValue, setReceiptShareMessageDraftValue] = useState("");
+  const [receiptShareDraftError, setReceiptShareDraftError] =
     useState<string | null>(null);
 
   useEffect(() => {
@@ -1889,6 +1993,161 @@ export function MonthlyExpensesTable({
     handleClosePaymentLinkDialog();
   };
 
+  const handleOpenSubtotalDialog = useCallback(({
+    currency,
+    expenseDescription,
+    expenseId,
+    subtotal,
+  }: {
+    currency: MonthlyExpenseCurrency;
+    expenseDescription: string;
+    expenseId: string;
+    subtotal: string;
+  }) => {
+    setSubtotalDialogState({
+      currency,
+      expenseDescription,
+      expenseId,
+    });
+    setSubtotalDraftValue(subtotal);
+    setSubtotalDraftError(null);
+  }, []);
+
+  const handleCloseSubtotalDialog = () => {
+    setSubtotalDialogState(null);
+    setSubtotalDraftValue("");
+    setSubtotalDraftError(null);
+  };
+
+  const handleSaveSubtotal = async () => {
+    if (!subtotalDialogState) {
+      return;
+    }
+
+    const normalizedSubtotal = Number(subtotalDraftValue);
+
+    const subtotalValidationError = validateSubtotalAmount(normalizedSubtotal);
+
+    if (subtotalValidationError) {
+      setSubtotalDraftError(subtotalValidationError);
+      return;
+    }
+
+    setSubtotalDraftError(null);
+    await onUpdateExpenseSubtotal({
+      expenseId: subtotalDialogState.expenseId,
+      subtotal: normalizedSubtotal,
+    });
+    handleCloseSubtotalDialog();
+  };
+
+  const handleOpenOccurrencesDialog = useCallback(({
+    expenseDescription,
+    expenseId,
+    occurrencesPerMonth,
+  }: {
+    expenseDescription: string;
+    expenseId: string;
+    occurrencesPerMonth: string;
+  }) => {
+    setOccurrencesDialogState({
+      expenseDescription,
+      expenseId,
+    });
+    setOccurrencesDraftValue(occurrencesPerMonth);
+    setOccurrencesDraftError(null);
+  }, []);
+
+  const handleCloseOccurrencesDialog = () => {
+    setOccurrencesDialogState(null);
+    setOccurrencesDraftValue("");
+    setOccurrencesDraftError(null);
+  };
+
+  const handleSaveOccurrences = async () => {
+    if (!occurrencesDialogState) {
+      return;
+    }
+
+    const normalizedOccurrences = Number(occurrencesDraftValue);
+
+    const occurrencesValidationError =
+      validateOccurrencesPerMonth(normalizedOccurrences);
+
+    if (occurrencesValidationError) {
+      setOccurrencesDraftError(occurrencesValidationError);
+      return;
+    }
+
+    setOccurrencesDraftError(null);
+    await onUpdateExpenseOccurrencesPerMonth({
+      expenseId: occurrencesDialogState.expenseId,
+      occurrencesPerMonth: normalizedOccurrences,
+    });
+    handleCloseOccurrencesDialog();
+  };
+
+  const handleOpenReceiptShareDialog = useCallback(({
+    expenseDescription,
+    expenseId,
+    mode,
+    receiptShareMessage,
+    receiptSharePhoneDigits,
+  }: {
+    expenseDescription: string;
+    expenseId: string;
+    mode: "create" | "edit";
+    receiptShareMessage: string;
+    receiptSharePhoneDigits: string;
+  }) => {
+    setReceiptShareDialogState({
+      expenseDescription,
+      expenseId,
+      mode,
+    });
+    setReceiptSharePhoneDraftValue(receiptSharePhoneDigits);
+    setReceiptShareMessageDraftValue(receiptShareMessage);
+    setReceiptShareDraftError(null);
+  }, []);
+
+  const handleCloseReceiptShareDialog = () => {
+    setReceiptShareDialogState(null);
+    setReceiptSharePhoneDraftValue("");
+    setReceiptShareMessageDraftValue("");
+    setReceiptShareDraftError(null);
+  };
+
+  const handleSaveReceiptShare = async () => {
+    if (!receiptShareDialogState) {
+      return;
+    }
+
+    const normalizedPhoneDigits = normalizeReceiptSharePhoneDigits(
+      receiptSharePhoneDraftValue,
+    );
+
+    if (!normalizedPhoneDigits) {
+      setReceiptShareDraftError(RECEIPT_SHARE_PHONE_REQUIRED_ERROR_MESSAGE);
+      return;
+    }
+
+    const receiptSharePhoneValidationError =
+      validateReceiptSharePhoneDigits(normalizedPhoneDigits);
+
+    if (receiptSharePhoneValidationError) {
+      setReceiptShareDraftError(receiptSharePhoneValidationError);
+      return;
+    }
+
+    setReceiptShareDraftError(null);
+    await onUpdateExpenseReceiptShare({
+      expenseId: receiptShareDialogState.expenseId,
+      receiptShareMessage: receiptShareMessageDraftValue,
+      receiptSharePhoneDigits: normalizedPhoneDigits,
+    });
+    handleCloseReceiptShareDialog();
+  };
+
   const columns = useMemo<ColumnDef<MonthlyExpensesEditableRow>[]>(
     () => [
       {
@@ -1941,12 +2200,34 @@ export function MonthlyExpensesTable({
       },
       {
         accessorKey: "subtotal",
-        cell: ({ row }) =>
-          formatArsWithUsdSecondary({
-            exchangeRateSnapshot,
-            rowCurrency: row.original.currency,
-            value: row.original.subtotal,
-          }),
+        cell: ({ row }) => {
+          const expenseDescription = row.original.description.trim() || "gasto";
+
+          return (
+            <div className={styles.quickEditCell}>
+              <span>
+                {formatArsWithUsdSecondary({
+                  exchangeRateSnapshot,
+                  rowCurrency: row.original.currency,
+                  value: row.original.subtotal,
+                })}
+              </span>
+              <QuickEditActionsMenu
+                actionDisabled={actionDisabled}
+                editActionLabel="Editar subtotal"
+                expenseDescription={expenseDescription}
+                onEdit={() =>
+                  handleOpenSubtotalDialog({
+                    currency: row.original.currency,
+                    expenseId: row.original.id,
+                    expenseDescription,
+                    subtotal: row.original.subtotal,
+                  })}
+                triggerAriaLabel="Abrir acciones de subtotal"
+              />
+            </div>
+          );
+        },
         header: getSortableHeader("Subtotal"),
         meta: { label: "Subtotal" },
         sortingFn: (rowA, rowB) =>
@@ -1967,6 +2248,27 @@ export function MonthlyExpensesTable({
       },
       {
         accessorKey: "occurrencesPerMonth",
+        cell: ({ row }) => {
+          const expenseDescription = row.original.description.trim() || "gasto";
+
+          return (
+            <div className={styles.quickEditCell}>
+              <span>{row.original.occurrencesPerMonth}</span>
+              <QuickEditActionsMenu
+                actionDisabled={actionDisabled}
+                editActionLabel="Editar pagos por mes"
+                expenseDescription={expenseDescription}
+                onEdit={() =>
+                  handleOpenOccurrencesDialog({
+                    expenseId: row.original.id,
+                    expenseDescription,
+                    occurrencesPerMonth: row.original.occurrencesPerMonth,
+                  })}
+                triggerAriaLabel="Abrir acciones de pagos por mes"
+              />
+            </div>
+          );
+        },
         header: getSortableHeader("por mes"),
         meta: { label: "por mes" },
         sortingFn: (rowA, rowB) =>
@@ -2254,28 +2556,76 @@ export function MonthlyExpensesTable({
         accessorFn: (row) => getReceiptShareWhatsAppLink(row),
         cell: ({ row }) => {
           const receiptShareLink = getReceiptShareWhatsAppLink(row.original);
+          const expenseDescription = row.original.description.trim() || "gasto";
+          const hasReceiptShareTarget =
+            row.original.requiresReceiptShare &&
+            row.original.receiptSharePhoneDigits.trim().length > 0;
 
-          if (!receiptShareLink) {
-            return null;
+          if (!hasReceiptShareTarget) {
+            return (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    aria-label={`Agregar datos de envío para ${expenseDescription}`}
+                    className={styles.paymentLinkActionButton}
+                    disabled={actionDisabled}
+                    onClick={() =>
+                      handleOpenReceiptShareDialog({
+                        expenseId: row.original.id,
+                        expenseDescription,
+                        mode: "create",
+                        receiptShareMessage: row.original.receiptShareMessage,
+                        receiptSharePhoneDigits: row.original.receiptSharePhoneDigits,
+                      })}
+                    size="icon-sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <Plus aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Agregar datos de envío</TooltipContent>
+              </Tooltip>
+            );
           }
 
           const phoneDigits = row.original.receiptSharePhoneDigits.trim();
 
           return (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <a
-                  className={styles.paymentLinkAction}
-                  href={receiptShareLink}
-                  rel="noopener noreferrer"
-                  target="_blank"
-                >
-                  Enviar
-                  <ExternalLink aria-hidden="true" className={styles.paymentLinkIcon} />
-                </a>
-              </TooltipTrigger>
-              <TooltipContent>{`Enviar comprobante a ${phoneDigits}`}</TooltipContent>
-            </Tooltip>
+            <div className={styles.paymentLinkActionsRow}>
+              {receiptShareLink ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <a
+                      className={styles.paymentLinkAction}
+                      href={receiptShareLink}
+                      rel="noopener noreferrer"
+                      target="_blank"
+                    >
+                      Enviar
+                      <ExternalLink aria-hidden="true" className={styles.paymentLinkIcon} />
+                    </a>
+                  </TooltipTrigger>
+                  <TooltipContent>{`Enviar comprobante a ${phoneDigits}`}</TooltipContent>
+                </Tooltip>
+              ) : (
+                <span className={styles.mutedValue}>Sin comprobantes</span>
+              )}
+              <QuickEditActionsMenu
+                actionDisabled={actionDisabled}
+                editActionLabel="Editar datos de envío"
+                expenseDescription={expenseDescription}
+                onEdit={() =>
+                  handleOpenReceiptShareDialog({
+                    expenseId: row.original.id,
+                    expenseDescription,
+                    mode: "edit",
+                    receiptShareMessage: row.original.receiptShareMessage,
+                    receiptSharePhoneDigits: row.original.receiptSharePhoneDigits,
+                  })}
+                triggerAriaLabel="Abrir acciones de envío"
+              />
+            </div>
           );
         },
         header: getSortableHeader("Enviar"),
@@ -2587,6 +2937,9 @@ export function MonthlyExpensesTable({
       onAddManualPaymentRecord,
       onUploadReceipt,
       onUpdateReceiptShareStatus,
+      handleOpenSubtotalDialog,
+      handleOpenOccurrencesDialog,
+      handleOpenReceiptShareDialog,
       handleOpenPaymentLinkDialog,
     ],
   );
@@ -2844,6 +3197,232 @@ export function MonthlyExpensesTable({
           showUnsavedChangesDialog={showUnsavedChangesDialog}
           validationMessage={validationMessage}
         />
+
+        <AlertDialog
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              handleCloseSubtotalDialog();
+            }
+          }}
+          open={subtotalDialogState != null}
+        >
+          <AlertDialogContent className={styles.paymentLinkDialogContent} size="sm">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Editar subtotal</AlertDialogTitle>
+              <AlertDialogDescription>
+                {`Actualizá el subtotal de ${subtotalDialogState?.expenseDescription ?? "este gasto"}.`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+
+            <div className={styles.paymentLinkDialogField}>
+              <Label htmlFor="subtotal-dialog-input">Subtotal</Label>
+              <InputGroup>
+                <InputGroupAddon align="inline-start" aria-hidden="true">
+                  {subtotalDialogState?.currency === "USD" ? "US$" : "$"}
+                </InputGroupAddon>
+                <InputGroupInput
+                  aria-invalid={subtotalDraftError ? "true" : "false"}
+                  aria-label={`Subtotal de ${subtotalDialogState?.expenseDescription ?? "gasto"}`}
+                  autoFocus
+                  id="subtotal-dialog-input"
+                  inputMode="decimal"
+                  onChange={(event) => {
+                    setSubtotalDraftValue(event.target.value);
+
+                    if (subtotalDraftError) {
+                      setSubtotalDraftError(null);
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void handleSaveSubtotal();
+                    }
+                  }}
+                  placeholder="0"
+                  type="number"
+                  value={subtotalDraftValue}
+                />
+              </InputGroup>
+              {subtotalDraftError ? (
+                <p className={styles.paymentLinkDialogError} role="alert">
+                  {subtotalDraftError}
+                </p>
+              ) : null}
+            </div>
+
+            <AlertDialogFooter className={styles.paymentLinkDialogActions}>
+              <Button
+                onClick={handleCloseSubtotalDialog}
+                type="button"
+                variant="outline"
+              >
+                Cancelar
+              </Button>
+              <Button
+                disabled={actionDisabled}
+                onClick={() => {
+                  void handleSaveSubtotal();
+                }}
+                type="button"
+              >
+                Guardar
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              handleCloseOccurrencesDialog();
+            }
+          }}
+          open={occurrencesDialogState != null}
+        >
+          <AlertDialogContent className={styles.paymentLinkDialogContent} size="sm">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Editar pagos por mes</AlertDialogTitle>
+              <AlertDialogDescription>
+                {`Actualizá la frecuencia mensual de ${occurrencesDialogState?.expenseDescription ?? "este gasto"}.`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+
+            <div className={styles.paymentLinkDialogField}>
+              <Label htmlFor="occurrences-dialog-input">Pagos por mes</Label>
+              <Input
+                aria-invalid={occurrencesDraftError ? "true" : "false"}
+                aria-label={`Pagos por mes de ${occurrencesDialogState?.expenseDescription ?? "gasto"}`}
+                autoFocus
+                id="occurrences-dialog-input"
+                inputMode="numeric"
+                min="1"
+                onChange={(event) => {
+                  setOccurrencesDraftValue(event.target.value);
+
+                  if (occurrencesDraftError) {
+                    setOccurrencesDraftError(null);
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void handleSaveOccurrences();
+                  }
+                }}
+                step="1"
+                type="number"
+                value={occurrencesDraftValue}
+              />
+              {occurrencesDraftError ? (
+                <p className={styles.paymentLinkDialogError} role="alert">
+                  {occurrencesDraftError}
+                </p>
+              ) : null}
+            </div>
+
+            <AlertDialogFooter className={styles.paymentLinkDialogActions}>
+              <Button
+                onClick={handleCloseOccurrencesDialog}
+                type="button"
+                variant="outline"
+              >
+                Cancelar
+              </Button>
+              <Button
+                disabled={actionDisabled}
+                onClick={() => {
+                  void handleSaveOccurrences();
+                }}
+                type="button"
+              >
+                Guardar
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              handleCloseReceiptShareDialog();
+            }
+          }}
+          open={receiptShareDialogState != null}
+        >
+          <AlertDialogContent className={styles.paymentLinkDialogContent} size="sm">
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {receiptShareDialogState?.mode === "create"
+                  ? "Agregar datos de envío"
+                  : "Editar datos de envío"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {`Completá WhatsApp y mensaje opcional para ${receiptShareDialogState?.expenseDescription ?? "este gasto"}.`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+
+            <div className={styles.paymentLinkDialogField}>
+              <Label htmlFor="receipt-share-phone-dialog-input">
+                Número de WhatsApp
+              </Label>
+              <Input
+                aria-invalid={receiptShareDraftError ? "true" : "false"}
+                aria-label={`Número de WhatsApp de ${receiptShareDialogState?.expenseDescription ?? "gasto"}`}
+                autoFocus
+                id="receipt-share-phone-dialog-input"
+                inputMode="numeric"
+                onChange={(event) => {
+                  setReceiptSharePhoneDraftValue(event.target.value);
+
+                  if (receiptShareDraftError) {
+                    setReceiptShareDraftError(null);
+                  }
+                }}
+                placeholder="5491123456789"
+                type="tel"
+                value={receiptSharePhoneDraftValue}
+              />
+              <Label htmlFor="receipt-share-message-dialog-input">
+                Mensaje opcional
+              </Label>
+              <Input
+                aria-label={`Mensaje opcional de ${receiptShareDialogState?.expenseDescription ?? "gasto"}`}
+                id="receipt-share-message-dialog-input"
+                onChange={(event) => {
+                  setReceiptShareMessageDraftValue(event.target.value);
+                }}
+                placeholder="Opcional"
+                type="text"
+                value={receiptShareMessageDraftValue}
+              />
+              {receiptShareDraftError ? (
+                <p className={styles.paymentLinkDialogError} role="alert">
+                  {receiptShareDraftError}
+                </p>
+              ) : null}
+            </div>
+
+            <AlertDialogFooter className={styles.paymentLinkDialogActions}>
+              <Button
+                onClick={handleCloseReceiptShareDialog}
+                type="button"
+                variant="outline"
+              >
+                Cancelar
+              </Button>
+              <Button
+                disabled={actionDisabled}
+                onClick={() => {
+                  void handleSaveReceiptShare();
+                }}
+                type="button"
+              >
+                Guardar
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <AlertDialog
           onOpenChange={(nextOpen) => {

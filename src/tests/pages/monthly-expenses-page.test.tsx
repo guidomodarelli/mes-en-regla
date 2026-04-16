@@ -4239,6 +4239,158 @@ describe("MonthlyExpensesPage", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("opens a dedicated subtotal modal from the subtotal actions menu", async () => {
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <MonthlyExpensesPage
+        {...basePageProps}
+        initialDocument={{
+          items: [
+            {
+              currency: "ARS",
+              description: "Agua",
+              id: "expense-1",
+              occurrencesPerMonth: 1,
+              subtotal: 10774.53,
+              total: 10774.53,
+            },
+          ],
+          month: "2026-03",
+        }}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Abrir acciones de subtotal para Agua" }),
+    );
+    await user.click(screen.getByRole("menuitem", { name: "Editar subtotal" }));
+
+    expect(screen.getByRole("heading", { name: "Editar subtotal" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Editar gasto" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens a dedicated receipt share modal from the enviar actions menu", async () => {
+    const user = userEvent.setup();
+    const receiptViewUrl =
+      "https://drive.google.com/file/d/receipt-file-id/view";
+
+    renderWithProviders(
+      <MonthlyExpensesPage
+        {...basePageProps}
+        initialDocument={{
+          items: [
+            {
+              currency: "ARS",
+              description: "Internet",
+              id: "expense-1",
+              occurrencesPerMonth: 1,
+              receiptShareMessage: "Hola",
+              receiptSharePhoneDigits: "5491123456789",
+              receiptShareStatus: "pending",
+              requiresReceiptShare: true,
+              receipts: [
+                {
+                  allReceiptsFolderId: "receipt-folder-id",
+                  allReceiptsFolderViewUrl:
+                    "https://drive.google.com/drive/folders/receipt-folder-id",
+                  coveredPayments: 1,
+                  fileId: "receipt-file-id",
+                  fileName: "comprobante.pdf",
+                  fileViewUrl: receiptViewUrl,
+                  monthlyFolderId: "receipt-month-folder-id",
+                  monthlyFolderViewUrl:
+                    "https://drive.google.com/drive/folders/receipt-month-folder-id",
+                },
+              ],
+              subtotal: 45,
+              total: 45,
+            },
+          ],
+          month: "2026-03",
+        }}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Abrir acciones de envío para Internet" }),
+    );
+    await user.click(screen.getByRole("menuitem", { name: "Editar datos de envío" }));
+
+    expect(
+      screen.getByRole("heading", { name: "Editar datos de envío" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Editar gasto" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("saves subtotal changes from the dedicated subtotal modal", async () => {
+    const user = userEvent.setup();
+    const fetchMock = createMonthlyExpensesFetchMock();
+
+    mockedUseSession.mockReturnValue({
+      data: {
+        expires: "2099-01-01T00:00:00.000Z",
+        user: {
+          email: "gus@example.com",
+          name: "Gus",
+        },
+      },
+      status: "authenticated",
+      update: jest.fn(),
+    } as ReturnType<typeof useSession>);
+    global.fetch = fetchMock as typeof fetch;
+
+    renderWithProviders(
+      <MonthlyExpensesPage
+        {...basePageProps}
+        initialDocument={{
+          items: [
+            {
+              currency: "ARS",
+              description: "Agua",
+              id: "expense-1",
+              occurrencesPerMonth: 1,
+              subtotal: 100,
+              total: 100,
+            },
+          ],
+          month: "2026-03",
+        }}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Abrir acciones de subtotal para Agua" }),
+    );
+    await user.click(screen.getByRole("menuitem", { name: "Editar subtotal" }));
+
+    const subtotalInput = screen.getByLabelText("Subtotal de Agua");
+
+    await user.clear(subtotalInput);
+    await user.type(subtotalInput, "250");
+    await user.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() => {
+      expect(getMonthlyExpensesSavePayload(fetchMock)).toEqual({
+        items: [
+          {
+            currency: "ARS",
+            description: "Agua",
+            id: "expense-1",
+            occurrencesPerMonth: 1,
+            paymentLink: null,
+            subtotal: 250,
+          },
+        ],
+        month: "2026-03",
+      });
+    });
+  });
+
   it("keeps thousands editing semantics when deleting digits from a formatted subtotal", async () => {
     const user = userEvent.setup();
 

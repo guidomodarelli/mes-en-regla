@@ -660,9 +660,24 @@
 }
 
 .paymentLinkActionsRow {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.2rem;
+  justify-content: space-between;
+  gap: 0.35rem;
+  width: 100%;
+  max-width: 12rem;
+  margin-left: auto;
+}
+
+.quickEditCell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  width: 100%;
+  max-width: 9rem;
+  margin-left: auto;
+  text-align: right;
 }
 
 .receiptShareStatusValue {
