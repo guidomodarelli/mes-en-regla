@@ -823,7 +823,7 @@ registerMonthlyExpensesPageDefaultHooks({
 
     await user.click(
       screen.getByRole("button", {
-        name: /1 comprobante/i,
+        name: /1 registro/i,
       }),
     );
 
@@ -909,7 +909,7 @@ registerMonthlyExpensesPageDefaultHooks({
 
     await user.click(
       screen.getByRole("button", {
-        name: /1 comprobante/i,
+        name: /1 registro/i,
       }),
     );
 
@@ -1002,7 +1002,7 @@ registerMonthlyExpensesPageDefaultHooks({
 
     await user.click(
       screen.getByRole("button", {
-        name: /2 comprobantes/i,
+        name: /3 registros/i,
       }),
     );
 
@@ -1187,7 +1187,7 @@ registerMonthlyExpensesPageDefaultHooks({
 
     await user.click(
       screen.getByRole("button", {
-        name: /1 comprobante/i,
+        name: /1 registro/i,
       }),
     );
 

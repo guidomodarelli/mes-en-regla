@@ -73,6 +73,7 @@ import {
   ExternalLink,
   Mail,
   MoreVertical,
+  Paperclip,
   Plus,
   Pencil,
   Trash2,
@@ -1633,9 +1634,6 @@ function PaymentHistoryCell({
   const receiptPaymentRecordsCount = paymentRecords.filter(
     (paymentRecord) => Boolean(paymentRecord.receipt),
   ).length;
-  const receiptCountLabel = receiptPaymentRecordsCount === 1
-    ? "comprobante"
-    : "comprobantes";
   const recordsCountLabel = paymentRecords.length === 1
     ? "registro"
     : "registros";
@@ -1775,9 +1773,16 @@ function PaymentHistoryCell({
       <Popover>
         <PopoverTrigger asChild>
           <Button className={styles.extraReceiptsTrigger} type="button" variant="link">
-            {receiptPaymentRecordsCount > 0
-              ? `${paymentRecords.length} ${recordsCountLabel} · 📎 ${receiptPaymentRecordsCount} ${receiptCountLabel}`
-              : `${paymentRecords.length} ${recordsCountLabel}`}
+            {`${paymentRecords.length} ${recordsCountLabel}`}
+            {receiptPaymentRecordsCount > 0 ? (
+              <span className={styles.receiptCountIndicator}>
+                {" ("}
+                <Paperclip aria-hidden="true" className={styles.receiptCountIcon} />
+                {"\u00A0"}
+                {receiptPaymentRecordsCount}
+                {")"}
+              </span>
+            ) : null}
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className={styles.extraReceiptsPopover}>
@@ -1824,7 +1829,11 @@ function PaymentHistoryCell({
                             rel="noopener noreferrer"
                             target="_blank"
                           >
-                            📎 Ver comprobante
+                            <Paperclip
+                              aria-hidden="true"
+                              className={styles.receiptLinkIcon}
+                            />
+                            Ver comprobante
                             <ExternalLink
                               aria-hidden="true"
                               className={styles.paymentLinkIcon}

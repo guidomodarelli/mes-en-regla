@@ -652,8 +652,8 @@
   align-items: center;
   gap: 0.35rem;
   color: var(--primary);
-  text-decoration: underline;
-  text-underline-offset: 0.12em;
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
 }
 
 .paymentLinkAction:hover {
@@ -794,18 +794,35 @@
 }
 
 .extraReceiptsTrigger {
+  display: inline-flex;
+  align-items: center;
   min-width: auto;
   height: auto;
   padding: 0;
   border: 0;
+  border-bottom: 1px solid currentColor;
   border-radius: 0;
   color: var(--primary);
-  text-decoration: underline;
-  text-underline-offset: 0.12em;
+  text-decoration: none;
 }
 
 .extraReceiptsTrigger:hover {
   color: color-mix(in srgb, var(--primary) 82%, var(--foreground));
+}
+
+.receiptCountIndicator {
+  display: inline-flex;
+  align-items: center;
+}
+
+.receiptCountIcon {
+  width: 0.85em;
+  height: 0.85em;
+}
+
+.receiptLinkIcon {
+  width: 0.85em;
+  height: 0.85em;
 }
 
 .extraReceiptsPopover {
