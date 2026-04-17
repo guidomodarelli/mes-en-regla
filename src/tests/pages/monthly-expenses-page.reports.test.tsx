@@ -570,7 +570,7 @@ registerMonthlyExpensesPageDefaultHooks({
 
     await user.click(
       screen.getByRole("button", {
-        name: "Registrar nuevo pago para Internet",
+        name: "Agregar nuevo registro de pago para Internet",
       }),
     );
     const manualPaymentsInput = screen.getByRole("spinbutton", {
@@ -629,7 +629,7 @@ registerMonthlyExpensesPageDefaultHooks({
 
     await user.click(
       screen.getByRole("button", {
-        name: "Registrar nuevo pago para Internet",
+        name: "Agregar nuevo registro de pago para Internet",
       }),
     );
     const manualPaymentsInput = screen.getByRole("spinbutton", {
@@ -699,7 +699,7 @@ registerMonthlyExpensesPageDefaultHooks({
 
     await user.click(
       screen.getByRole("button", {
-        name: "Registrar nuevo pago para Internet",
+        name: "Agregar nuevo registro de pago para Internet",
       }),
     );
     const manualPaymentsInput = screen.getByRole("spinbutton", {
@@ -1093,7 +1093,7 @@ registerMonthlyExpensesPageDefaultHooks({
     await user.click(screen.getByRole("button", { name: /registros/i }));
 
     const registerPaymentButton = screen.getByRole("button", {
-      name: "Registrar nuevo pago para Internet",
+      name: "Agregar nuevo registro de pago para Internet",
     });
 
     expect(registerPaymentButton).toBeDisabled();

@@ -1874,7 +1874,7 @@ registerMonthlyExpensesPageDefaultHooks({
 
     await user.click(
       screen.getByRole("button", {
-        name: "Registrar nuevo pago para Internet abril",
+        name: "Agregar nuevo registro de pago para Internet abril",
       }),
     );
     const manualPaymentsInput = screen.getByRole("spinbutton", {

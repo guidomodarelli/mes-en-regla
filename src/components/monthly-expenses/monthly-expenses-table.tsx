@@ -1784,14 +1784,16 @@ function PaymentHistoryCell({
           <div className={styles.extraReceiptsList}>
             <div className={styles.manualPaymentsControls}>
               <Button
-                aria-label={`Registrar nuevo pago para ${expenseDescription}`}
+                aria-label={`Agregar nuevo registro de pago para ${expenseDescription}`}
+                className={styles.manualPaymentsRegisterButton}
                 disabled={actionDisabled || maxPaymentsPerRecord <= 0}
                 onClick={() => setIsRegisterPaymentDialogOpen(true)}
                 size="sm"
                 type="button"
                 variant="outline"
               >
-                Registrar nuevo pago
+                <Plus aria-hidden="true" />
+                Agregar nuevo registro de pago
               </Button>
             </div>
             {sortedPaymentRecords.map((paymentRecord) => {
