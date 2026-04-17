@@ -138,6 +138,7 @@ interface ExpenseReceiptUploadState {
 }
 
 interface ExpenseReceiptCoverageEditState {
+  canManageReceipt: boolean;
   currentCoveredPayments: number;
   error: string | null;
   expenseDescription: string;
@@ -148,6 +149,7 @@ interface ExpenseReceiptCoverageEditState {
   paymentRecordId: string | null;
   receiptFileId: string | null;
   receiptFileName: string | null;
+  receiptFileViewUrl: string | null;
 }
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -184,6 +186,7 @@ function createClosedExpenseReceiptUploadState(): ExpenseReceiptUploadState {
 
 function createClosedExpenseReceiptCoverageEditState(): ExpenseReceiptCoverageEditState {
   return {
+    canManageReceipt: false,
     currentCoveredPayments: 1,
     error: null,
     expenseDescription: "",
@@ -194,6 +197,7 @@ function createClosedExpenseReceiptCoverageEditState(): ExpenseReceiptCoverageEd
     paymentRecordId: null,
     receiptFileId: null,
     receiptFileName: null,
+    receiptFileViewUrl: null,
   };
 }
 
@@ -2156,7 +2160,17 @@ export default function MonthlyExpensesPage({
       return;
     }
 
+    const paymentRecord = (expenseRow.paymentRecords ?? []).find(
+      (item) => item.receipt?.fileId === receiptFileId,
+    );
+
+    if (!paymentRecord) {
+      toast.warning("No pudimos encontrar el registro asociado al comprobante.");
+      return;
+    }
+
     updateExpenseReceiptCoverageEditState(() => ({
+      canManageReceipt: true,
       currentCoveredPayments: receipt.coveredPayments,
       error: null,
       expenseDescription: expenseRow.description,
@@ -2167,9 +2181,10 @@ export default function MonthlyExpensesPage({
         receiptFileId,
         row: expenseRow,
       }),
-      paymentRecordId: null,
+      paymentRecordId: paymentRecord.id,
       receiptFileId,
       receiptFileName: receipt.fileName,
+      receiptFileViewUrl: receipt.fileViewUrl,
     }));
   };
 
@@ -2198,6 +2213,7 @@ export default function MonthlyExpensesPage({
     }
 
     updateExpenseReceiptCoverageEditState(() => ({
+      canManageReceipt: false,
       currentCoveredPayments: manualRecord.coveredPayments,
       error: null,
       expenseDescription: expenseRow.description,
@@ -2211,6 +2227,7 @@ export default function MonthlyExpensesPage({
       paymentRecordId,
       receiptFileId: null,
       receiptFileName: null,
+      receiptFileViewUrl: null,
     }));
   };
 
@@ -2218,7 +2235,127 @@ export default function MonthlyExpensesPage({
     setExpenseReceiptCoverageEditState(createClosedExpenseReceiptCoverageEditState());
   };
 
-  const handleSaveReceiptCoverage = async (coveredPayments: number) => {
+  const handleDeleteReceiptFromCoverageEditor = async () => {
+    if (!isOAuthConfigured || !isAuthenticated) {
+      toast.warning("Conectate con Google para eliminar comprobantes.");
+      return;
+    }
+
+    const activeExpenseId = expenseReceiptCoverageEditState.expenseId;
+    const activeReceiptFileId = expenseReceiptCoverageEditState.receiptFileId;
+    const activePaymentRecordId = expenseReceiptCoverageEditState.paymentRecordId;
+
+    if (!activeExpenseId || !activeReceiptFileId || !activePaymentRecordId) {
+      updateExpenseReceiptCoverageEditState((currentState) => ({
+        ...currentState,
+        error: "No pudimos identificar el comprobante para eliminar.",
+      }));
+      return;
+    }
+
+    const expenseRow = formState.rows.find((row) => row.id === activeExpenseId);
+
+    if (!expenseRow) {
+      updateExpenseReceiptCoverageEditState((currentState) => ({
+        ...currentState,
+        error: "No pudimos encontrar el gasto seleccionado.",
+      }));
+      return;
+    }
+
+    const paymentRecord = (expenseRow.paymentRecords ?? []).find(
+      (item) =>
+        item.id === activePaymentRecordId &&
+        item.receipt?.fileId === activeReceiptFileId,
+    );
+
+    if (!paymentRecord?.receipt) {
+      updateExpenseReceiptCoverageEditState((currentState) => ({
+        ...currentState,
+        error: "No pudimos encontrar el comprobante seleccionado.",
+      }));
+      return;
+    }
+
+    updateExpenseReceiptCoverageEditState((currentState) => ({
+      ...currentState,
+      error: null,
+      isSubmitting: true,
+    }));
+
+    try {
+      if (paymentRecord.receipt.fileStatus !== "missing") {
+        await deleteMonthlyExpenseReceiptViaApi({
+          fileId: activeReceiptFileId,
+        });
+      }
+
+      const nextRows = formState.rows.map((row) =>
+        row.id !== activeExpenseId
+          ? row
+          : synchronizeRowPaymentCoverage({
+              ...row,
+              paymentRecords: (row.paymentRecords ?? []).map((record) =>
+                record.id !== activePaymentRecordId
+                  ? record
+                  : {
+                      ...record,
+                      receipt: undefined,
+                    }),
+            }),
+      );
+      const wasSaved = await persistMonthlyExpensesRows(nextRows, {
+        loading: "Eliminando comprobante...",
+        success: "Comprobante eliminado correctamente.",
+      });
+
+      if (!wasSaved) {
+        updateExpenseReceiptCoverageEditState((currentState) => ({
+          ...currentState,
+          isSubmitting: false,
+        }));
+        return;
+      }
+
+      const updatedExpenseRow = nextRows.find((row) => row.id === activeExpenseId);
+      const updatedRecord = updatedExpenseRow?.paymentRecords?.find(
+        (record) => record.id === activePaymentRecordId && !record.receipt,
+      );
+
+      updateExpenseReceiptCoverageEditState((currentState) => ({
+        ...currentState,
+        currentCoveredPayments:
+          updatedRecord?.coveredPayments ?? currentState.currentCoveredPayments,
+        error: null,
+        isSubmitting: false,
+        maxCoveredPayments: updatedExpenseRow
+          ? getMaxManualCoveredPayments({
+              excludedPaymentRecordId: activePaymentRecordId,
+              row: updatedExpenseRow,
+            })
+          : currentState.maxCoveredPayments,
+        paymentRecordId: activePaymentRecordId,
+        receiptFileId: null,
+        receiptFileName: null,
+        receiptFileViewUrl: null,
+      }));
+    } catch (error) {
+      updateExpenseReceiptCoverageEditState((currentState) => ({
+        ...currentState,
+        error: getSafeMonthlyExpensesErrorMessage(error),
+        isSubmitting: false,
+      }));
+      toast.error("No pudimos eliminar el comprobante.");
+    }
+  };
+
+  const handleSaveReceiptCoverage = async ({
+    coveredPayments,
+    replacementFile,
+  }: {
+    coveredPayments: number;
+    replacementFile: File | null;
+  }) => {
     if (!isOAuthConfigured || !isAuthenticated) {
       toast.warning("Conectate con Google para editar registros.");
       return;
@@ -2306,6 +2443,101 @@ export default function MonthlyExpensesPage({
     }));
 
     try {
+      if (replacementFile) {
+        if (!activePaymentRecordId) {
+          updateExpenseReceiptCoverageEditState((currentState) => ({
+            ...currentState,
+            error: "No pudimos identificar el registro para adjuntar el comprobante.",
+            isSubmitting: false,
+          }));
+          return;
+        }
+
+        const replacementMimeType = getValidReceiptMimeType(replacementFile);
+
+        if (!replacementMimeType) {
+          updateExpenseReceiptCoverageEditState((currentState) => ({
+            ...currentState,
+            error: "Solo se permiten comprobantes PDF, JPG, PNG, WEBP, HEIC o HEIF.",
+            isSubmitting: false,
+          }));
+          return;
+        }
+
+        if (replacementFile.size > MAX_RECEIPT_FILE_SIZE_BYTES) {
+          updateExpenseReceiptCoverageEditState((currentState) => ({
+            ...currentState,
+            error: "El comprobante supera los 5MB. Elegí un archivo más liviano.",
+            isSubmitting: false,
+          }));
+          return;
+        }
+
+        const replacementContentBase64 = await fileToBase64WithProgress(
+          replacementFile,
+          () => undefined,
+        );
+        const replacementReceiptUpload = await uploadMonthlyExpenseReceiptViaApi({
+          contentBase64: replacementContentBase64,
+          coveredPayments,
+          expenseDescription: expenseRow.description,
+          fileName: replacementFile.name,
+          month: formState.month,
+          mimeType: replacementMimeType,
+        });
+
+        const nextRows = formState.rows.map((row) =>
+          row.id !== activeExpenseId
+            ? row
+            : synchronizeRowPaymentCoverage({
+                ...row,
+                allReceiptsFolderId: replacementReceiptUpload.allReceiptsFolderId,
+                allReceiptsFolderStatus: undefined,
+                allReceiptsFolderViewUrl: replacementReceiptUpload.allReceiptsFolderViewUrl,
+                monthlyFolderId: replacementReceiptUpload.monthlyFolderId,
+                monthlyFolderStatus: undefined,
+                monthlyFolderViewUrl: replacementReceiptUpload.monthlyFolderViewUrl,
+                paymentRecords: (row.paymentRecords ?? []).map((paymentRecord) =>
+                  paymentRecord.id !== activePaymentRecordId
+                    ? paymentRecord
+                    : {
+                        ...paymentRecord,
+                        coveredPayments,
+                        receipt: {
+                          allReceiptsFolderId:
+                            replacementReceiptUpload.allReceiptsFolderId,
+                          allReceiptsFolderViewUrl:
+                            replacementReceiptUpload.allReceiptsFolderViewUrl,
+                          coveredPayments: replacementReceiptUpload.coveredPayments,
+                          fileId: replacementReceiptUpload.fileId,
+                          fileName: replacementReceiptUpload.fileName,
+                          fileViewUrl: replacementReceiptUpload.fileViewUrl,
+                          monthlyFolderId: replacementReceiptUpload.monthlyFolderId,
+                          monthlyFolderViewUrl:
+                            replacementReceiptUpload.monthlyFolderViewUrl,
+                        },
+                        registeredAt: replacementReceiptUpload.registeredAt,
+                      }),
+              }),
+        );
+
+        const wasSaved = await persistMonthlyExpensesRows(nextRows, {
+          loading: "Guardando comprobante...",
+          success: "Comprobante subido correctamente.",
+        });
+
+        if (!wasSaved) {
+          updateExpenseReceiptCoverageEditState((currentState) => ({
+            ...currentState,
+            isSubmitting: false,
+          }));
+          return;
+        }
+
+        setExpenseReceiptCoverageEditState(createClosedExpenseReceiptCoverageEditState());
+        return;
+      }
+
       const nextRows = formState.rows.map((row) =>
         row.id !== activeExpenseId
           ? row
@@ -3445,6 +3677,7 @@ export default function MonthlyExpensesPage({
 
       {expenseReceiptCoverageEditState.isOpen ? (
         <ExpenseReceiptCoverageEditDialog
+          canManageReceipt={expenseReceiptCoverageEditState.canManageReceipt}
           currentCoveredPayments={expenseReceiptCoverageEditState.currentCoveredPayments}
           errorMessage={expenseReceiptCoverageEditState.error}
           expenseDescription={expenseReceiptCoverageEditState.expenseDescription}
@@ -3452,8 +3685,10 @@ export default function MonthlyExpensesPage({
           isSubmitting={expenseReceiptCoverageEditState.isSubmitting}
           maxCoveredPayments={expenseReceiptCoverageEditState.maxCoveredPayments}
           onClose={handleCloseReceiptCoverageEditor}
+          onDeleteReceipt={handleDeleteReceiptFromCoverageEditor}
           onSave={handleSaveReceiptCoverage}
           receiptFileName={expenseReceiptCoverageEditState.receiptFileName}
+          receiptFileViewUrl={expenseReceiptCoverageEditState.receiptFileViewUrl}
         />
       ) : null}
 

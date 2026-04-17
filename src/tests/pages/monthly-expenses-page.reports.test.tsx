@@ -1087,11 +1087,17 @@ registerMonthlyExpensesPageDefaultHooks({
     );
 
     const coveredPaymentsLabel = screen.getByText("¿Cuántos pagos desea cubrir?");
-    const receiptFileName = screen.getByText("Archivo: comprobante.pdf");
+    const receiptFileName = screen.getByRole("link", { name: /comprobante\.pdf/i });
     expect(
       coveredPaymentsLabel.compareDocumentPosition(receiptFileName) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+    expect(receiptFileName).toHaveAttribute(
+      "href",
+      "https://drive.google.com/file/d/receipt-file-id/view",
+    );
+    expect(receiptFileName).toHaveAttribute("target", "_blank");
+    expect(receiptFileName).toHaveAttribute("rel", "noopener noreferrer");
 
     const coveredPaymentsInput = screen.getByRole("spinbutton", {
       name: "¿Cuántos pagos desea cubrir?",
@@ -1106,6 +1112,193 @@ registerMonthlyExpensesPageDefaultHooks({
       const payload = getMonthlyExpensesSavePayload(fetchMock);
 
       expect(payload.items[0]?.receipts?.[0]?.coveredPayments).toBe(4);
+    });
+  });
+
+  it("deletes a receipt from edit modal and allows uploading a replacement in the same flow", async () => {
+    const user = userEvent.setup();
+    const fetchMock = jest.fn().mockImplementation(async (input: RequestInfo | URL) => {
+      if (input === "/api/storage/monthly-expenses") {
+        return {
+          ok: true,
+          status: 204,
+        };
+      }
+
+      if (input === "/api/storage/monthly-expenses-receipts") {
+        return {
+          json: async () => ({
+            data: {
+              allReceiptsFolderId: "receipt-folder-id",
+              allReceiptsFolderViewUrl:
+                "https://drive.google.com/drive/folders/receipt-folder-id",
+              coveredPayments: 1,
+              fileId: "replacement-receipt-file-id",
+              fileName: "comprobante-reemplazo.pdf",
+              fileViewUrl:
+                "https://drive.google.com/file/d/replacement-receipt-file-id/view",
+              monthlyFolderId: "receipt-month-folder-id",
+              monthlyFolderViewUrl:
+                "https://drive.google.com/drive/folders/receipt-month-folder-id",
+              registeredAt: "2026-03-10T12:00:00.000Z",
+            },
+          }),
+          ok: true,
+        };
+      }
+
+      if (
+        typeof input === "string" &&
+        input.startsWith("/api/storage/monthly-expenses-receipts?")
+      ) {
+        return {
+          ok: true,
+          status: 204,
+        };
+      }
+
+      if (
+        typeof input === "string" &&
+        input.startsWith("/api/storage/monthly-expenses?")
+      ) {
+        return {
+          json: async () => ({
+            data: {
+              items: [],
+              month: "2026-03",
+            },
+          }),
+          ok: true,
+        };
+      }
+
+      if (input === "/api/storage/monthly-expenses-report") {
+        return {
+          json: async () => ({
+            data: {
+              entries: [],
+              summary: {
+                activeLoanCount: 0,
+                lenderCount: 0,
+                remainingAmount: 0,
+                trackedLoanCount: 0,
+              },
+            },
+          }),
+          ok: true,
+        };
+      }
+
+      throw new Error(`Unexpected fetch input: ${String(input)}`);
+    });
+
+    mockedUseSession.mockReturnValue({
+      data: {
+        expires: "2099-01-01T00:00:00.000Z",
+        user: {
+          email: "user@example.com",
+          name: "User",
+        },
+      },
+      status: "authenticated",
+      update: jest.fn(),
+    } as ReturnType<typeof useSession>);
+    global.fetch = fetchMock as typeof fetch;
+
+    renderWithProviders(
+      <MonthlyExpensesPage
+        {...basePageProps}
+        initialDocument={{
+          items: [
+            {
+              currency: "ARS",
+              description: "Internet",
+              id: "expense-1",
+              occurrencesPerMonth: 4,
+              receipts: [
+                {
+                  allReceiptsFolderId: "receipt-folder-id",
+                  allReceiptsFolderViewUrl:
+                    "https://drive.google.com/drive/folders/receipt-folder-id",
+                  coveredPayments: 1,
+                  fileId: "receipt-file-id",
+                  fileName: "comprobante.pdf",
+                  fileViewUrl:
+                    "https://drive.google.com/file/d/receipt-file-id/view",
+                  monthlyFolderId: "receipt-month-folder-id",
+                  monthlyFolderViewUrl:
+                    "https://drive.google.com/drive/folders/receipt-month-folder-id",
+                },
+              ],
+              subtotal: 100,
+              total: 400,
+            },
+          ],
+          month: "2026-03",
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /1 registro/i }));
+    await user.click(
+      screen.getByRole("button", {
+        name:
+          "Abrir acciones de registro de pago para comprobante comprobante.pdf de Internet",
+      }),
+    );
+    await user.click(screen.getByRole("menuitem", { name: "Editar registro" }));
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Abrir acciones de comprobante comprobante.pdf",
+      }),
+    );
+    await user.click(screen.getByRole("menuitem", { name: "Eliminar comprobante" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: "Confirmar eliminación de comprobante comprobante.pdf",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          ([url]) =>
+            typeof url === "string" &&
+            url.startsWith("/api/storage/monthly-expenses-receipts?"),
+        ),
+      ).toBe(true);
+    });
+
+    expect(
+      screen.getByLabelText("Seleccionar nuevo comprobante para Internet"),
+    ).toBeInTheDocument();
+
+    const replacementFile = new File(["replacement-receipt"], "comprobante-reemplazo.pdf", {
+      type: "application/pdf",
+    });
+    const replacementInput = screen.getByLabelText(
+      "Seleccionar nuevo comprobante para Internet",
+    );
+    await user.upload(replacementInput, replacementFile);
+    await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
+
+    await waitFor(() => {
+      const saveCalls = fetchMock.mock.calls.filter(
+        ([url]) => url === "/api/storage/monthly-expenses",
+      );
+      const latestSaveCall = saveCalls[saveCalls.length - 1];
+
+      expect(latestSaveCall).toBeDefined();
+
+      const [, options] = latestSaveCall as [string, RequestInit];
+      const payload = JSON.parse(String(options.body));
+
+      expect(payload.items[0]?.receipts?.[0]?.fileId).toBe("replacement-receipt-file-id");
+      expect(payload.items[0]?.receipts?.[0]?.fileName).toBe("comprobante-reemplazo.pdf");
+      expect(payload.items[0]?.receipts?.[0]?.fileViewUrl).toBe(
+        "https://drive.google.com/file/d/replacement-receipt-file-id/view",
+      );
     });
   });
 
