@@ -3,6 +3,7 @@ import type { MonthlyExpenseItemResult } from "@/modules/monthly-expenses/applic
 
 import {
   copyMonthlyExpenseTemplatesToMonth,
+  getExpenseValidationMessage,
   getMaxManualCoveredPayments,
   toEditableRows,
   toSaveMonthlyExpensesCommand,
@@ -403,5 +404,47 @@ describe("monthly expenses page mappers", () => {
     });
 
     expect(maxManualCoveredPayments).toBe(2);
+  });
+
+  it("requires a valid receipt share phone when creating an expense", () => {
+    const editableRow = toEditableRows({
+      items: [
+        {
+          currency: "ARS",
+          description: "Internet",
+          id: "expense-1",
+          occurrencesPerMonth: 1,
+          receiptSharePhoneDigits: "",
+          requiresReceiptShare: true,
+          subtotal: 100,
+          total: 100,
+        },
+      ],
+      month: "2026-03",
+    })[0];
+
+    expect(getExpenseValidationMessage("2026-03", editableRow, "create")).toBe(
+      "Corregí los errores antes de continuar.",
+    );
+  });
+
+  it("does not block edit mode for legacy invalid receipt share phone values", () => {
+    const editableRow = toEditableRows({
+      items: [
+        {
+          currency: "ARS",
+          description: "Internet",
+          id: "expense-1",
+          occurrencesPerMonth: 1,
+          receiptSharePhoneDigits: "",
+          requiresReceiptShare: true,
+          subtotal: 100,
+          total: 100,
+        },
+      ],
+      month: "2026-03",
+    })[0];
+
+    expect(getExpenseValidationMessage("2026-03", editableRow, "edit")).toBeNull();
   });
 });

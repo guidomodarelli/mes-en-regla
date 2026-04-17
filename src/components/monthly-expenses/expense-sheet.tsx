@@ -136,24 +136,31 @@ function getExpenseSheetFormValues(
   };
 }
 
-function getFieldErrors(draft: MonthlyExpensesEditableRow): ExpenseFieldErrorMap {
+function getFieldErrors(
+  draft: MonthlyExpensesEditableRow,
+  mode: "create" | "edit",
+): ExpenseFieldErrorMap {
   const fieldErrors: ExpenseFieldErrorMap = {};
   const subtotal = Number(draft.subtotal);
   const occurrencesPerMonth = Number(draft.occurrencesPerMonth);
   const installmentCount = Number(draft.installmentCount);
+  const isCreateMode = mode === "create";
 
   if (!draft.description.trim()) {
     fieldErrors.description = "Completá la descripción.";
   }
 
-  const subtotalValidationError = validateSubtotalAmount(subtotal);
+  const subtotalValidationError = isCreateMode
+    ? validateSubtotalAmount(subtotal)
+    : null;
 
   if (subtotalValidationError) {
     fieldErrors.subtotal = subtotalValidationError;
   }
 
-  const occurrencesValidationError =
-    validateOccurrencesPerMonth(occurrencesPerMonth);
+  const occurrencesValidationError = isCreateMode
+    ? validateOccurrencesPerMonth(occurrencesPerMonth)
+    : null;
 
   if (occurrencesValidationError) {
     fieldErrors.occurrencesPerMonth = occurrencesValidationError;
@@ -167,7 +174,7 @@ function getFieldErrors(draft: MonthlyExpensesEditableRow): ExpenseFieldErrorMap
     fieldErrors.installmentCount = "Completá la cantidad total de cuotas.";
   }
 
-  if (draft.requiresReceiptShare) {
+  if (isCreateMode && draft.requiresReceiptShare) {
     const receiptSharePhoneValidationError = validateReceiptSharePhoneDigits(
       draft.receiptSharePhoneDigits,
     );
@@ -232,7 +239,7 @@ function ExpenseSheetContent({
   showUnsavedChangesDialog,
   validationMessage,
 }: ExpenseSheetContentProps) {
-
+  const isCreateMode = mode === "create";
   const title = mode === "create" ? "Nuevo gasto" : "Editar gasto";
   const description =
     mode === "create"
@@ -249,7 +256,7 @@ function ExpenseSheetContent({
   const form = useForm<ExpenseSheetFormValues>({
     values: getExpenseSheetFormValues(draft),
   });
-  const fieldErrors = useMemo(() => getFieldErrors(draft), [draft]);
+  const fieldErrors = useMemo(() => getFieldErrors(draft, mode), [draft, mode]);
   const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
   const shouldShowValidation = hasAttemptedSave;
   const lenderIsMissing = draft.isLoan && !draft.lenderId.trim();
@@ -386,156 +393,160 @@ function ExpenseSheetContent({
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="currency"
-                  render={() => (
-                    <FormItem className={styles.fieldGroup}>
-                      <FormLabel>
-                        {getFieldLabel("Moneda", changedFields.has("currency"))}
-                      </FormLabel>
-                      <div className={styles.fieldControlWrapper}>
-                        <Select
-                          onValueChange={(value) => onFieldChange("currency", value)}
-                          value={draft.currency}
-                        >
-                          <FormControl>
-                            <SelectTrigger
-                              aria-label="Moneda"
-                              className={cn(
-                                changedFields.has("currency") && styles.changedField,
-                              )}
-                              data-changed={
-                                changedFields.has("currency") ? "true" : "false"
-                              }
-                            >
-                              <SelectValue placeholder="Moneda" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="ARS">Peso argentino (ARS)</SelectItem>
-                            <SelectItem value="USD">Dolar estadounidense (USD)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage className={styles.fieldErrorText} />
-                      </div>
-                    </FormItem>
-                  )}
-                />
+                {isCreateMode ? (
+                  <FormField
+                    control={form.control}
+                    name="currency"
+                    render={() => (
+                      <FormItem className={styles.fieldGroup}>
+                        <FormLabel>
+                          {getFieldLabel("Moneda", changedFields.has("currency"))}
+                        </FormLabel>
+                        <div className={styles.fieldControlWrapper}>
+                          <Select
+                            onValueChange={(value) => onFieldChange("currency", value)}
+                            value={draft.currency}
+                          >
+                            <FormControl>
+                              <SelectTrigger
+                                aria-label="Moneda"
+                                className={cn(
+                                  changedFields.has("currency") && styles.changedField,
+                                )}
+                                data-changed={
+                                  changedFields.has("currency") ? "true" : "false"
+                                }
+                              >
+                                <SelectValue placeholder="Moneda" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="ARS">Peso argentino (ARS)</SelectItem>
+                              <SelectItem value="USD">Dolar estadounidense (USD)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage className={styles.fieldErrorText} />
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                ) : null}
               </div>
 
-              <div className={cn(styles.grid, styles.amountGrid)}>
-                <FormField
-                  control={form.control}
-                  name="subtotal"
-                  render={() => (
-                    <FormItem className={styles.fieldGroup}>
-                      <FormLabel>
-                        {getFieldLabel("Subtotal", changedFields.has("subtotal"))}
-                      </FormLabel>
-                      <div className={styles.fieldControlWrapper}>
-                        <InputGroup
-                          className={cn(
-                            shouldShowValidation &&
-                              fieldErrors.subtotal &&
-                              styles.invalidField,
-                            changedFields.has("subtotal") && styles.changedField,
+              {isCreateMode ? (
+                <div className={cn(styles.grid, styles.amountGrid)}>
+                  <FormField
+                    control={form.control}
+                    name="subtotal"
+                    render={() => (
+                      <FormItem className={styles.fieldGroup}>
+                        <FormLabel>
+                          {getFieldLabel("Subtotal", changedFields.has("subtotal"))}
+                        </FormLabel>
+                        <div className={styles.fieldControlWrapper}>
+                          <InputGroup
+                            className={cn(
+                              shouldShowValidation &&
+                                fieldErrors.subtotal &&
+                                styles.invalidField,
+                              changedFields.has("subtotal") && styles.changedField,
+                            )}
+                            data-changed={
+                              changedFields.has("subtotal") ? "true" : "false"
+                            }
+                          >
+                            <InputGroupAddon align="inline-start" aria-hidden="true">
+                              {currencyPrefix}
+                            </InputGroupAddon>
+                            <FormControl>
+                              <InputGroupInput
+                                aria-label="Subtotal"
+                                data-changed={
+                                  changedFields.has("subtotal") ? "true" : "false"
+                                }
+                                inputMode="decimal"
+                                onChange={(event) =>
+                                  onFieldChange(
+                                    "subtotal",
+                                    normalizeCurrencyInput(event.target.value),
+                                  )
+                                }
+                                type="text"
+                                value={formatCurrencyDisplayWithOptions(
+                                  draft.subtotal,
+                                  {
+                                    preserveExplicitFractionDigits: true,
+                                  },
+                                )}
+                              />
+                            </FormControl>
+                          </InputGroup>
+                          <FormMessage className={styles.fieldErrorText} />
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="occurrencesPerMonth"
+                    render={() => (
+                      <FormItem className={styles.fieldGroup}>
+                        <FormLabel>
+                          {getFieldLabel(
+                            "Frecuencia de pago",
+                            changedFields.has("occurrencesPerMonth"),
                           )}
-                          data-changed={
-                            changedFields.has("subtotal") ? "true" : "false"
-                          }
-                        >
-                          <InputGroupAddon align="inline-start" aria-hidden="true">
-                            {currencyPrefix}
-                          </InputGroupAddon>
+                        </FormLabel>
+                        <div className={styles.fieldControlWrapper}>
                           <FormControl>
-                            <InputGroupInput
-                              aria-label="Subtotal"
-                              data-changed={
-                                changedFields.has("subtotal") ? "true" : "false"
+                            <PaymentFrequencyField
+                              key={draft.id}
+                              hasError={
+                                shouldShowValidation &&
+                                Boolean(fieldErrors.occurrencesPerMonth)
                               }
-                              inputMode="decimal"
-                              onChange={(event) =>
-                                onFieldChange(
-                                  "subtotal",
-                                  normalizeCurrencyInput(event.target.value),
-                                )
+                              isChanged={changedFields.has("occurrencesPerMonth")}
+                              occurrencesPerMonth={draft.occurrencesPerMonth}
+                              onOccurrencesPerMonthChange={(value) =>
+                                onFieldChange("occurrencesPerMonth", value)
                               }
-                              type="text"
-                              value={formatCurrencyDisplayWithOptions(
-                                draft.subtotal,
-                                {
-                                  preserveExplicitFractionDigits: true,
-                                },
-                              )}
                             />
                           </FormControl>
-                        </InputGroup>
-                        <FormMessage className={styles.fieldErrorText} />
-                      </div>
-                    </FormItem>
-                  )}
-                />
+                          <FormMessage className={styles.fieldErrorText} />
+                        </div>
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="occurrencesPerMonth"
-                  render={() => (
-                    <FormItem className={styles.fieldGroup}>
-                      <FormLabel>
-                        {getFieldLabel(
-                          "Frecuencia de pago",
-                          changedFields.has("occurrencesPerMonth"),
-                        )}
-                      </FormLabel>
-                      <div className={styles.fieldControlWrapper}>
-                        <FormControl>
-                          <PaymentFrequencyField
-                            key={draft.id}
-                            hasError={
-                              shouldShowValidation &&
-                              Boolean(fieldErrors.occurrencesPerMonth)
-                            }
-                            isChanged={changedFields.has("occurrencesPerMonth")}
-                            occurrencesPerMonth={draft.occurrencesPerMonth}
-                            onOccurrencesPerMonthChange={(value) =>
-                              onFieldChange("occurrencesPerMonth", value)
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage className={styles.fieldErrorText} />
-                      </div>
-                    </FormItem>
-                  )}
-                />
-
-                <div className={styles.fieldGroup}>
-                  <Label className={styles.totalLabel} htmlFor="expense-total">
-                    <span>Total</span>
-                    <span className={styles.totalFormula}>
-                      (Subtotal {totalFormulaSubtotal} x {totalFormulaOccurrences} veces
-                      al mes)
-                    </span>
-                  </Label>
-                  <InputGroup className={styles.readOnlyInputGroup}>
-                    <InputGroupAddon
-                      align="inline-start"
-                      aria-hidden="true"
-                      className={cn(styles.readOnlyField, styles.readOnlyAddon)}
-                    >
-                      {currencyPrefix}
-                    </InputGroupAddon>
-                    <InputGroupInput
-                      aria-label="Total"
-                      className={styles.readOnlyField}
-                      id="expense-total"
-                      readOnly
-                      type="text"
-                      value={formatCurrencyDisplay(draft.total)}
-                    />
-                  </InputGroup>
+                  <div className={styles.fieldGroup}>
+                    <Label className={styles.totalLabel} htmlFor="expense-total">
+                      <span>Total</span>
+                      <span className={styles.totalFormula}>
+                        (Subtotal {totalFormulaSubtotal} x {totalFormulaOccurrences} veces
+                        al mes)
+                      </span>
+                    </Label>
+                    <InputGroup className={styles.readOnlyInputGroup}>
+                      <InputGroupAddon
+                        align="inline-start"
+                        aria-hidden="true"
+                        className={cn(styles.readOnlyField, styles.readOnlyAddon)}
+                      >
+                        {currencyPrefix}
+                      </InputGroupAddon>
+                      <InputGroupInput
+                        aria-label="Total"
+                        className={styles.readOnlyField}
+                        id="expense-total"
+                        readOnly
+                        type="text"
+                        value={formatCurrencyDisplay(draft.total)}
+                      />
+                    </InputGroup>
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               <div className={styles.loanSection}>
                 <div className={styles.loanToggleRow}>
@@ -715,118 +726,120 @@ function ExpenseSheetContent({
                 ) : null}
               </div>
 
-              <div className={styles.loanSection}>
-                <div className={styles.loanToggleRow}>
-                  <div className={styles.fieldControlWrapper}>
-                    <input
-                      checked={draft.requiresReceiptShare}
-                      className={styles.loanToggle}
-                      id="expense-requires-receipt-share"
-                      onChange={(event) => onReceiptShareToggle(event.target.checked)}
-                      type="checkbox"
-                    />
+              {isCreateMode ? (
+                <div className={styles.loanSection}>
+                  <div className={styles.loanToggleRow}>
+                    <div className={styles.fieldControlWrapper}>
+                      <input
+                        checked={draft.requiresReceiptShare}
+                        className={styles.loanToggle}
+                        id="expense-requires-receipt-share"
+                        onChange={(event) => onReceiptShareToggle(event.target.checked)}
+                        type="checkbox"
+                      />
+                    </div>
+                    <div className={styles.loanToggleLabelGroup}>
+                      <Label htmlFor="expense-requires-receipt-share">
+                        {getFieldLabel(
+                          "¿Necesitas enviar el comprobante a alguien?",
+                          changedFields.has("requiresReceiptShare"),
+                        )}
+                      </Label>
+                    </div>
                   </div>
-                  <div className={styles.loanToggleLabelGroup}>
-                    <Label htmlFor="expense-requires-receipt-share">
-                      {getFieldLabel(
-                        "¿Necesitas enviar el comprobante a alguien?",
-                        changedFields.has("requiresReceiptShare"),
-                      )}
-                    </Label>
-                  </div>
+
+                  {draft.requiresReceiptShare ? (
+                    <>
+                      <FormField
+                        control={form.control}
+                        name="receiptSharePhoneDigits"
+                        render={() => (
+                          <FormItem className={styles.fieldGroup}>
+                            <FormLabel>
+                              {getFieldLabel(
+                                "Número de teléfono (WhatsApp)",
+                                changedFields.has("receiptSharePhoneDigits"),
+                              )}
+                            </FormLabel>
+                            <div className={styles.fieldControlWrapper}>
+                              <FormControl>
+                                <Input
+                                  aria-label="Número de teléfono (WhatsApp)"
+                                  className={cn(
+                                    shouldShowValidation &&
+                                      fieldErrors.receiptSharePhoneDigits &&
+                                      styles.invalidField,
+                                    changedFields.has("receiptSharePhoneDigits") &&
+                                      styles.changedField,
+                                  )}
+                                  data-changed={
+                                    changedFields.has("receiptSharePhoneDigits")
+                                      ? "true"
+                                      : "false"
+                                  }
+                                  inputMode="numeric"
+                                  onChange={(event) =>
+                                    onFieldChange(
+                                      "receiptSharePhoneDigits",
+                                      event.target.value,
+                                    )
+                                  }
+                                  placeholder="Ej: 5491123456789"
+                                  type="tel"
+                                  value={formatReceiptSharePhoneDisplay(
+                                    draft.receiptSharePhoneDigits,
+                                  )}
+                                />
+                              </FormControl>
+                              <FormMessage className={styles.fieldErrorText} />
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="receiptShareMessage"
+                        render={() => (
+                          <FormItem className={styles.fieldGroup}>
+                            <FormLabel>
+                              {getFieldLabel(
+                                "Mensaje personalizado (opcional)",
+                                changedFields.has("receiptShareMessage"),
+                              )}
+                            </FormLabel>
+                            <div className={styles.fieldControlWrapper}>
+                              <FormControl>
+                                <Textarea
+                                  aria-label="Mensaje personalizado (opcional)"
+                                  className={cn(
+                                    changedFields.has("receiptShareMessage") &&
+                                      styles.changedField,
+                                  )}
+                                  data-changed={
+                                    changedFields.has("receiptShareMessage")
+                                      ? "true"
+                                      : "false"
+                                  }
+                                  onChange={(event) =>
+                                    onFieldChange(
+                                      "receiptShareMessage",
+                                      event.target.value,
+                                    )
+                                  }
+                                  placeholder="Opcional"
+                                  value={draft.receiptShareMessage}
+                                />
+                              </FormControl>
+                              <FormMessage className={styles.fieldErrorText} />
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                    </>
+                  ) : null}
                 </div>
-
-                {draft.requiresReceiptShare ? (
-                  <>
-                    <FormField
-                      control={form.control}
-                      name="receiptSharePhoneDigits"
-                      render={() => (
-                        <FormItem className={styles.fieldGroup}>
-                          <FormLabel>
-                            {getFieldLabel(
-                              "Número de teléfono (WhatsApp)",
-                              changedFields.has("receiptSharePhoneDigits"),
-                            )}
-                          </FormLabel>
-                          <div className={styles.fieldControlWrapper}>
-                            <FormControl>
-                              <Input
-                                aria-label="Número de teléfono (WhatsApp)"
-                                className={cn(
-                                  shouldShowValidation &&
-                                    fieldErrors.receiptSharePhoneDigits &&
-                                    styles.invalidField,
-                                  changedFields.has("receiptSharePhoneDigits") &&
-                                    styles.changedField,
-                                )}
-                                data-changed={
-                                  changedFields.has("receiptSharePhoneDigits")
-                                    ? "true"
-                                    : "false"
-                                }
-                                inputMode="numeric"
-                                onChange={(event) =>
-                                  onFieldChange(
-                                    "receiptSharePhoneDigits",
-                                    event.target.value,
-                                  )
-                                }
-                                placeholder="Ej: 5491123456789"
-                                type="tel"
-                                value={formatReceiptSharePhoneDisplay(
-                                  draft.receiptSharePhoneDigits,
-                                )}
-                              />
-                            </FormControl>
-                            <FormMessage className={styles.fieldErrorText} />
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="receiptShareMessage"
-                      render={() => (
-                        <FormItem className={styles.fieldGroup}>
-                          <FormLabel>
-                            {getFieldLabel(
-                              "Mensaje personalizado (opcional)",
-                              changedFields.has("receiptShareMessage"),
-                            )}
-                          </FormLabel>
-                          <div className={styles.fieldControlWrapper}>
-                            <FormControl>
-                              <Textarea
-                                aria-label="Mensaje personalizado (opcional)"
-                                className={cn(
-                                  changedFields.has("receiptShareMessage") &&
-                                    styles.changedField,
-                                )}
-                                data-changed={
-                                  changedFields.has("receiptShareMessage")
-                                    ? "true"
-                                    : "false"
-                                }
-                                onChange={(event) =>
-                                  onFieldChange(
-                                    "receiptShareMessage",
-                                    event.target.value,
-                                  )
-                                }
-                                placeholder="Opcional"
-                                value={draft.receiptShareMessage}
-                              />
-                            </FormControl>
-                            <FormMessage className={styles.fieldErrorText} />
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-                  </>
-                ) : null}
-              </div>
+              ) : null}
             </form>
           </Form>
 

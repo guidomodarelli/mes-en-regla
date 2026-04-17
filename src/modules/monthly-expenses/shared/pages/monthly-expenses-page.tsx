@@ -960,9 +960,10 @@ function createClosedExpenseSheetState(): ExpenseSheetState {
 const GENERIC_EXPENSE_VALIDATION_MESSAGE =
   "Corregí los errores antes de continuar.";
 
-function getExpenseValidationMessage(
+export function getExpenseValidationMessage(
   month: string,
   row: MonthlyExpensesEditableRow | null,
+  mode: "create" | "edit",
 ): string | null {
   if (!row) {
     return null;
@@ -1016,6 +1017,7 @@ function getExpenseValidationMessage(
   }
 
   if (
+    mode === "create" &&
     row.requiresReceiptShare &&
     validateReceiptSharePhoneDigits(row.receiptSharePhoneDigits) !== null
   ) {
@@ -1385,6 +1387,7 @@ export default function MonthlyExpensesPage({
   const expenseValidationMessage = getExpenseValidationMessage(
     formState.month,
     expenseSheetState.draft,
+    expenseSheetState.mode,
   );
   const dirtyExpenseFields = getChangedExpenseFields(
     expenseSheetState.originalRow,

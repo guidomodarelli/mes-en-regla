@@ -1296,20 +1296,26 @@ registerMonthlyExpensesPageDefaultHooks({
       screen.getByRole("heading", { name: "Editar gasto" }),
     ).toBeInTheDocument();
     expect(screen.getByDisplayValue("Agua")).toBeInTheDocument();
-    expect(screen.getByLabelText("Subtotal")).toHaveValue("10.774,53");
+    expect(screen.queryByLabelText("Moneda")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Subtotal")).not.toBeInTheDocument();
+    expect(screen.queryByText("Frecuencia de pago")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Total")).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("¿Necesitas enviar el comprobante a alguien?"),
+    ).not.toBeInTheDocument();
 
-    await user.clear(screen.getByLabelText("Subtotal"));
-    await user.type(screen.getByLabelText("Subtotal"), "12000");
+    const descriptionInput = screen.getByLabelText("Descripción");
+    await user.clear(descriptionInput);
+    await user.type(descriptionInput, "Agua y cloaca");
 
-    expect(screen.getByLabelText("Subtotal")).toHaveAttribute(
+    expect(descriptionInput).toHaveAttribute(
       "data-changed",
       "true",
     );
     expect(
       screen.getByText("Los labels amarillos subrayados marcan cambios sin guardar."),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("Subtotal")).toHaveValue("12.000");
-    expect(screen.getByLabelText("Total")).toHaveValue("12.000");
+    expect(descriptionInput).toHaveValue("Agua y cloaca");
 
     await user.click(screen.getByRole("button", { name: "Guardar" }));
 
@@ -1318,11 +1324,11 @@ registerMonthlyExpensesPageDefaultHooks({
         items: [
           {
             currency: "ARS",
-            description: "Agua",
+            description: "Agua y cloaca",
             id: "expense-1",
             occurrencesPerMonth: 1,
             paymentLink: null,
-            subtotal: 12000,
+            subtotal: 10774.53,
           },
         ],
         month: "2026-03",

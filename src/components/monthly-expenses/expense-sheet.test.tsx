@@ -37,33 +37,43 @@ function createDraftRow(): MonthlyExpensesEditableRow {
   };
 }
 
+function renderExpenseSheet({
+  draft = createDraftRow(),
+  mode = "create",
+}: {
+  draft?: MonthlyExpensesEditableRow;
+  mode?: "create" | "edit";
+}) {
+  return render(
+    <TooltipProvider>
+      <ExpenseSheet
+        actionDisabled={false}
+        changedFields={new Set()}
+        draft={draft}
+        isOpen={true}
+        isSubmitting={false}
+        lenders={[]}
+        mode={mode}
+        onAddLender={jest.fn()}
+        onFieldChange={jest.fn()}
+        onLenderSelect={jest.fn()}
+        onLoanToggle={jest.fn()}
+        onReceiptShareToggle={jest.fn()}
+        onRequestClose={jest.fn()}
+        onSave={jest.fn()}
+        onUnsavedChangesClose={jest.fn()}
+        onUnsavedChangesDiscard={jest.fn()}
+        onUnsavedChangesSave={jest.fn()}
+        showUnsavedChangesDialog={false}
+        validationMessage={null}
+      />
+    </TooltipProvider>,
+  );
+}
+
 describe("ExpenseSheet", () => {
   it("does not render manual covered payments or payment link inputs in the modal", () => {
-    render(
-      <TooltipProvider>
-        <ExpenseSheet
-          actionDisabled={false}
-          changedFields={new Set()}
-          draft={createDraftRow()}
-          isOpen={true}
-          isSubmitting={false}
-          lenders={[]}
-          mode="create"
-          onAddLender={jest.fn()}
-          onFieldChange={jest.fn()}
-          onLenderSelect={jest.fn()}
-          onLoanToggle={jest.fn()}
-          onReceiptShareToggle={jest.fn()}
-          onRequestClose={jest.fn()}
-          onSave={jest.fn()}
-          onUnsavedChangesClose={jest.fn()}
-          onUnsavedChangesDiscard={jest.fn()}
-          onUnsavedChangesSave={jest.fn()}
-          showUnsavedChangesDialog={false}
-          validationMessage={null}
-        />
-      </TooltipProvider>,
-    );
+    renderExpenseSheet({ mode: "create" });
 
     expect(screen.getByText("Frecuencia de pago")).toBeInTheDocument();
     expect(
@@ -72,5 +82,31 @@ describe("ExpenseSheet", () => {
     expect(screen.queryByLabelText("Pagos manuales")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Link de pago")).not.toBeInTheDocument();
     expect(screen.queryByText("Link de pago (Opcional)")).not.toBeInTheDocument();
+  });
+
+  it("hides duplicated inline-edit fields when editing an expense", () => {
+    renderExpenseSheet({
+      draft: {
+        ...createDraftRow(),
+        receiptShareMessage: "Mensaje de prueba",
+        receiptSharePhoneDigits: "5491123456789",
+        requiresReceiptShare: true,
+      },
+      mode: "edit",
+    });
+
+    expect(screen.queryByLabelText("Moneda")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Subtotal")).not.toBeInTheDocument();
+    expect(screen.queryByText("Frecuencia de pago")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Total")).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("¿Necesitas enviar el comprobante a alguien?"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Número de teléfono (WhatsApp)"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Mensaje personalizado (opcional)"),
+    ).not.toBeInTheDocument();
   });
 });
