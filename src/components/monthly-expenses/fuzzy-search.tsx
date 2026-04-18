@@ -78,6 +78,46 @@ function getSearchCharsWithSourceIndices(
   return chars;
 }
 
+export function getExactMatchIndices(value: string, query: string): number[] | null {
+  const normalizedQuery = normalizeSearchValue(query).trim();
+
+  if (!normalizedQuery) {
+    return [];
+  }
+
+  const valueChars = getSearchCharsWithSourceIndices(value);
+  const queryChars = Array.from(normalizedQuery);
+
+  if (queryChars.length > valueChars.length) {
+    return null;
+  }
+
+  for (let valueIndex = 0; valueIndex <= valueChars.length - queryChars.length; valueIndex += 1) {
+    let isExactMatch = true;
+
+    for (let queryIndex = 0; queryIndex < queryChars.length; queryIndex += 1) {
+      if (valueChars[valueIndex + queryIndex].char !== queryChars[queryIndex]) {
+        isExactMatch = false;
+        break;
+      }
+    }
+
+    if (!isExactMatch) {
+      continue;
+    }
+
+    const matchStartSourceIndex = valueChars[valueIndex].sourceIndex;
+    const matchEndSourceIndex = valueChars[valueIndex + queryChars.length - 1].sourceIndex;
+
+    return Array.from(
+      { length: matchEndSourceIndex - matchStartSourceIndex + 1 },
+      (_, index) => matchStartSourceIndex + index,
+    );
+  }
+
+  return null;
+}
+
 export function getFuzzyMatchIndices(value: string, query: string): number[] | null {
   const normalizedQuery = normalizeSearchValue(query).trim();
 

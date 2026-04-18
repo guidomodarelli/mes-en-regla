@@ -2253,7 +2253,7 @@ registerMonthlyExpensesPageDefaultHooks({
     expect(screen.getByLabelText("Descripción")).toBeInTheDocument();
   });
 
-  it("filters expenses by description with fuzzy, accent-insensitive matching and highlights matches", async () => {
+  it("filters expenses by description with exact, accent-insensitive matching and highlights contiguous matches", async () => {
     const user = userEvent.setup();
 
     renderWithProviders(
@@ -2283,7 +2283,7 @@ registerMonthlyExpensesPageDefaultHooks({
       />,
     );
 
-    await user.type(screen.getByRole("textbox", { name: "Filtrar gastos" }), "PRESTJ");
+    await user.type(screen.getByRole("textbox", { name: "Filtrar gastos" }), "PREST");
 
     const matchingDescription = screen.getByText(
       (_, element) => element?.textContent === "Préstamo tarjeta",
@@ -2304,7 +2304,7 @@ registerMonthlyExpensesPageDefaultHooks({
 
     expect(matchingDescription).toBeInTheDocument();
     expect(screen.queryByText("Agua")).not.toBeInTheDocument();
-    expect(highlightedText).toBe("Préstj");
+    expect(highlightedText).toBe("Prést");
 
     const clearFilterButton = screen.getByRole("button", {
       name: "Limpiar filtro",
@@ -2322,7 +2322,7 @@ registerMonthlyExpensesPageDefaultHooks({
     ).not.toBeInTheDocument();
   });
 
-  it("prioritizes fuzzy matches with contiguous letters over dispersed matches", async () => {
+  it("does not match non-contiguous text when filtering by exact description", async () => {
     const user = userEvent.setup();
 
     renderWithProviders(
@@ -2354,28 +2354,13 @@ registerMonthlyExpensesPageDefaultHooks({
 
     await user.type(screen.getByRole("textbox", { name: "Filtrar gastos" }), "abc");
 
-    const compactMatchRow = screen.getByText(
-      (_, element) => element?.textContent === "Abc gasto",
-    ).closest("tr");
-    const dispersedMatchRow = screen.getByText(
-      (_, element) => element?.textContent === "AxxBxxC gasto",
-    ).closest("tr");
-
-    expect(compactMatchRow).not.toBeNull();
-    expect(dispersedMatchRow).not.toBeNull();
-
-    if (!compactMatchRow || !dispersedMatchRow) {
-      throw new Error("Expected both fuzzy matching rows to be present");
-    }
-
-    const visibleRows = screen.getAllByRole("row");
-
-    expect(visibleRows.indexOf(compactMatchRow)).toBeLessThan(
-      visibleRows.indexOf(dispersedMatchRow),
-    );
+    expect(
+      screen.getByText((_, element) => element?.textContent === "Abc gasto"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("AxxBxxC gasto")).not.toBeInTheDocument();
   });
 
-  it("prioritizes ipe matches with more contiguous letters", async () => {
+  it("applies multiple negative filters and refreshes rows when removing a badge", async () => {
     const user = userEvent.setup();
 
     renderWithProviders(
@@ -2385,7 +2370,7 @@ registerMonthlyExpensesPageDefaultHooks({
           items: [
             {
               currency: "ARS",
-              description: "Impuestos del auto",
+              description: "Préstamo auto",
               id: "expense-1",
               occurrencesPerMonth: 1,
               subtotal: 10000,
@@ -2393,7 +2378,7 @@ registerMonthlyExpensesPageDefaultHooks({
             },
             {
               currency: "ARS",
-              description: "Limpieza Domestica",
+              description: "Préstamo tarjeta",
               id: "expense-2",
               occurrencesPerMonth: 1,
               subtotal: 12000,
@@ -2401,7 +2386,7 @@ registerMonthlyExpensesPageDefaultHooks({
             },
             {
               currency: "ARS",
-              description: "Iphone",
+              description: "Agua",
               id: "expense-3",
               occurrencesPerMonth: 1,
               subtotal: 15000,
@@ -2413,32 +2398,86 @@ registerMonthlyExpensesPageDefaultHooks({
       />,
     );
 
-    await user.type(screen.getByRole("textbox", { name: "Filtrar gastos" }), "ipe");
+    await user.type(screen.getByRole("textbox", { name: "Filtrar gastos" }), "PRESTAMO");
 
-    const iphoneRow = screen.getByText((_, element) => element?.textContent === "Iphone").closest("tr");
-    const impuestosRow = screen.getByText(
-      (_, element) => element?.textContent === "Impuestos del auto",
-    ).closest("tr");
-    const limpiezaRow = screen.getByText(
-      (_, element) => element?.textContent === "Limpieza Domestica",
-    ).closest("tr");
-
-    expect(iphoneRow).not.toBeNull();
-    expect(impuestosRow).not.toBeNull();
-    expect(limpiezaRow).not.toBeNull();
-
-    if (!iphoneRow || !impuestosRow || !limpiezaRow) {
-      throw new Error("Expected all ipe fuzzy matching rows to be present");
-    }
-
-    const visibleRows = screen.getAllByRole("row");
-
-    expect(visibleRows.indexOf(iphoneRow)).toBeLessThan(
-      visibleRows.indexOf(impuestosRow),
+    await user.click(
+      screen.getByRole("button", { name: "Mostrar filtros de exclusión" }),
     );
-    expect(visibleRows.indexOf(iphoneRow)).toBeLessThan(
-      visibleRows.indexOf(limpiezaRow),
+
+    const exclusionInput = screen.getByRole("textbox", {
+      name: "Excluir resultados",
+    });
+
+    await user.type(exclusionInput, "tarjeta{enter}");
+
+    expect(screen.getByText("− tarjeta")).toBeInTheDocument();
+    expect(
+      screen.getByText((_, element) => element?.textContent === "Préstamo auto"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Préstamo tarjeta")).not.toBeInTheDocument();
+
+    await user.type(exclusionInput, "auto{enter}");
+
+    expect(screen.getByText("− auto")).toBeInTheDocument();
+    expect(screen.queryByText("Préstamo auto")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("No hay resultados para los filtros actuales."),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Quitar exclusión auto" }));
+
+    expect(screen.queryByText("− auto")).not.toBeInTheDocument();
+    expect(
+      screen.getByText((_, element) => element?.textContent === "Préstamo auto"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("No hay resultados para los filtros actuales."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps exclusions active even when the main filter is empty", async () => {
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <MonthlyExpensesPage
+        {...basePageProps}
+        initialDocument={{
+          items: [
+            {
+              currency: "ARS",
+              description: "Internet casa",
+              id: "expense-1",
+              occurrencesPerMonth: 1,
+              subtotal: 10000,
+              total: 10000,
+            },
+            {
+              currency: "ARS",
+              description: "Agua",
+              id: "expense-2",
+              occurrencesPerMonth: 1,
+              subtotal: 12000,
+              total: 12000,
+            },
+          ],
+          month: "2026-03",
+        }}
+      />,
     );
+
+    await user.click(
+      screen.getByRole("button", { name: "Mostrar filtros de exclusión" }),
+    );
+
+    await user.type(
+      screen.getByRole("textbox", { name: "Excluir resultados" }),
+      "internet{enter}",
+    );
+
+    expect(screen.getByRole("textbox", { name: "Filtrar gastos" })).toHaveValue("");
+    expect(screen.getByText("− internet")).toBeInTheDocument();
+    expect(screen.queryByText("Internet casa")).not.toBeInTheDocument();
+    expect(screen.getByText("Agua")).toBeInTheDocument();
   });
 
   it("shows validation when a debt is missing start month or installments", async () => {

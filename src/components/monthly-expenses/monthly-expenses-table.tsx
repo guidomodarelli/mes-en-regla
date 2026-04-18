@@ -86,9 +86,7 @@ import {
 } from "@/components/monthly-expenses/expense-sheet";
 
 import {
-  compareFuzzyMatchRank,
-  getFuzzyMatchIndices,
-  getFuzzyMatchRank,
+  getExactMatchIndices,
   renderHighlightedText,
 } from "./fuzzy-search";
 import {
@@ -124,6 +122,9 @@ const MONTHLY_EXPENSES_TABLE_PREFERENCES_STORAGE_KEY =
 const MONTHLY_EXPENSES_DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
   usd: false,
 };
+const MONTHLY_EXPENSES_EMPTY_MESSAGE = "No hay gastos cargados para este mes.";
+const MONTHLY_EXPENSES_FILTERED_EMPTY_MESSAGE =
+  "No hay resultados para los filtros actuales.";
 const SORTABLE_COLUMN_IDS = new Set([
   "description",
   "paymentsProgress",
@@ -1273,47 +1274,24 @@ function getLoanSortValue(
   }
 }
 
-function compareDescriptionByFuzzyRank(
-  leftDescription: string,
-  rightDescription: string,
-  query: string,
-): number {
-  const leftRank = getFuzzyMatchRank(leftDescription, query);
-  const rightRank = getFuzzyMatchRank(rightDescription, query);
+function hasExactDescriptionMatch(value: string, query: string): boolean {
+  return getExactMatchIndices(value, query) !== null;
+}
 
-  if (leftRank && !rightRank) {
-    return -1;
-  }
+function includesExcludedDescription(
+  description: string,
+  excludedDescriptionFilters: string[],
+): boolean {
+  return excludedDescriptionFilters.some(
+    (excludedDescriptionFilter) =>
+      hasExactDescriptionMatch(description, excludedDescriptionFilter),
+  );
+}
 
-  if (!leftRank && rightRank) {
-    return 1;
-  }
-
-  if (!leftRank && !rightRank) {
-    return leftDescription.localeCompare(rightDescription, "es", {
-      sensitivity: "base",
-    });
-  }
-
-  if (!leftRank || !rightRank) {
-    return leftDescription.localeCompare(rightDescription, "es", {
-      sensitivity: "base",
-    });
-  }
-
-  const rankComparison = compareFuzzyMatchRank(leftRank, rightRank);
-
-  if (rankComparison !== 0) {
-    return rankComparison;
-  }
-
-  if (leftDescription.length !== rightDescription.length) {
-    return leftDescription.length - rightDescription.length;
-  }
-
-  return leftDescription.localeCompare(rightDescription, "es", {
-    sensitivity: "base",
-  });
+function getNonEmptyDescriptionFilters(descriptionFilters: string[]): string[] {
+  return descriptionFilters
+    .map((descriptionFilter) => descriptionFilter.trim())
+    .filter((descriptionFilter) => descriptionFilter.length > 0);
 }
 
 function formatCurrencyAmount(
@@ -2005,6 +1983,9 @@ export function MonthlyExpensesTable({
   const [isRestoringTablePreferences, setIsRestoringTablePreferences] =
     useState(true);
   const [descriptionFilter, setDescriptionFilter] = useState("");
+  const [excludedDescriptionFilters, setExcludedDescriptionFilters] = useState<
+    string[]
+  >([]);
   const [paymentLinkDialogState, setPaymentLinkDialogState] =
     useState<PaymentLinkDialogState | null>(null);
   const [paymentLinkDraftValue, setPaymentLinkDraftValue] = useState("");
@@ -2144,20 +2125,24 @@ export function MonthlyExpensesTable({
     sorting,
     LOAN_INSTALLMENT_END_COLUMN_ID,
   );
-  const fuzzySortedRows = useMemo(() => {
-    const normalizedFilter = descriptionFilter.trim();
-
-    if (!normalizedFilter) {
-      return rows;
-    }
-
-    return [...rows].sort((leftRow, rightRow) =>
-      compareDescriptionByFuzzyRank(
-        leftRow.description,
-        rightRow.description,
-        normalizedFilter,
-      ));
-  }, [descriptionFilter, rows]);
+  const nonEmptyExcludedDescriptionFilters = useMemo(
+    () => getNonEmptyDescriptionFilters(excludedDescriptionFilters),
+    [excludedDescriptionFilters],
+  );
+  const hasActiveDescriptionFiltering =
+    descriptionFilter.trim().length > 0 ||
+    nonEmptyExcludedDescriptionFilters.length > 0;
+  const rowsExcludingDescriptions = useMemo(
+    () =>
+      rows.filter(
+        (row) =>
+          !includesExcludedDescription(
+            row.description,
+            nonEmptyExcludedDescriptionFilters,
+          ),
+      ),
+    [nonEmptyExcludedDescriptionFilters, rows],
+  );
   const completedPendingReceiptShareCount = useMemo(() => {
     let pendingCount = 0;
 
@@ -2428,7 +2413,7 @@ export function MonthlyExpensesTable({
           const filterValue = String(
             table.getColumn("description")?.getFilterValue() ?? "",
           );
-          const matchIndices = getFuzzyMatchIndices(description, filterValue);
+          const matchIndices = getExactMatchIndices(description, filterValue);
 
           if (!matchIndices || matchIndices.length === 0) {
             return description;
@@ -2445,8 +2430,15 @@ export function MonthlyExpensesTable({
         filterFn: (row, columnId, filterValue) => {
           const description = String(row.getValue(columnId) ?? "");
           const query = String(filterValue ?? "");
+          const matchesDescriptionFilter = hasExactDescriptionMatch(
+            description,
+            query,
+          );
 
-          return getFuzzyMatchIndices(description, query) !== null;
+          if (!matchesDescriptionFilter) {
+            return false;
+          }
+          return true;
         },
         header: getSortableHeader("Descripción"),
         meta: {
@@ -3413,12 +3405,20 @@ export function MonthlyExpensesTable({
               hideableColumnsDefaultVisibility={
                 MONTHLY_EXPENSES_DEFAULT_COLUMN_VISIBILITY
               }
-              data={fuzzySortedRows}
-              emptyMessage="No hay gastos cargados para este mes."
+              data={rowsExcludingDescriptions}
+              emptyMessage={
+                hasActiveDescriptionFiltering
+                  ? MONTHLY_EXPENSES_FILTERED_EMPTY_MESSAGE
+                  : MONTHLY_EXPENSES_EMPTY_MESSAGE
+              }
+              excludeFilterLabel="Excluir resultados"
+              excludeFilterPlaceholder="Excluir gastos por descripción"
+              excludeFilterValues={excludedDescriptionFilters}
               filterColumnId="description"
               filterLabel="Filtrar gastos"
               filterPlaceholder="Filtrar gastos por descripción"
               filterValue={descriptionFilter}
+              onExcludeFilterValuesChange={setExcludedDescriptionFilters}
               getRowClassName={(row) =>
                 isPaymentCompleted(row) ? styles.paidRow : undefined
               }
@@ -3426,6 +3426,7 @@ export function MonthlyExpensesTable({
               onColumnVisibilityChange={setColumnVisibility}
               onSortingChange={setSorting}
               selectAllColumnsLabel="Restablecer"
+              showExcludeFilterToggle
               showColumnVisibilityToggle={true}
               sortingBadgeLabelOverrides={{
                 [LOAN_SORT_COLUMN_ID]: `Deuda / cuotas (${getLoanSortModeLabel(loanSortMode)})`,

@@ -15,7 +15,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, Ellipsis, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +53,12 @@ interface DataTableProps<TData, TValue> {
   filterPlaceholder?: string;
   filterValue?: string;
   onFilterValueChange?: (value: string) => void;
+  showExcludeFilterToggle?: boolean;
+  excludeFilterValues?: string[];
+  onExcludeFilterValuesChange?: (values: string[]) => void;
+  excludeFilterPlaceholder?: string;
+  excludeFilterLabel?: string;
+  excludeFilterToggleLabel?: string;
   showColumnVisibilityToggle?: boolean;
   columnVisibilityButtonLabel?: string;
   columnVisibilityMenuLabel?: string;
@@ -65,6 +71,21 @@ interface DataTableProps<TData, TValue> {
 interface DataTableColumnMeta {
   label?: string;
   cellClassName?: string;
+}
+
+const DIACRITICS_PATTERN = /[\u0300-\u036f]/g;
+const CLEAR_FILTER_ARIA_LABEL = "Limpiar filtro";
+const ACTIVE_EXCLUSIONS_SR_LABEL = "Filtros de exclusión activos";
+const HIDE_EXCLUDE_FILTERS_ARIA_LABEL = "Ocultar filtros de exclusión";
+const EMPTY_EXCLUDE_FILTER_ERROR_MESSAGE = "Ingresá un texto para excluir.";
+const DUPLICATE_EXCLUDE_FILTER_ERROR_MESSAGE = "Esa exclusión ya está activa.";
+
+function normalizeFilterToken(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(DIACRITICS_PATTERN, "")
+    .toLocaleLowerCase()
+    .trim();
 }
 
 export function DataTable<TData, TValue>({
@@ -81,6 +102,12 @@ export function DataTable<TData, TValue>({
   filterPlaceholder = "Filtrar...",
   filterValue: controlledFilterValue,
   onFilterValueChange,
+  showExcludeFilterToggle = false,
+  excludeFilterValues: controlledExcludeFilterValues,
+  onExcludeFilterValuesChange,
+  excludeFilterPlaceholder = "Excluir por descripción",
+  excludeFilterLabel = "Filtro de exclusión",
+  excludeFilterToggleLabel = "Mostrar filtros de exclusión",
   showColumnVisibilityToggle = false,
   columnVisibilityButtonLabel = "Columnas",
   columnVisibilityMenuLabel = "Mostrar columnas",
@@ -92,14 +119,79 @@ export function DataTable<TData, TValue>({
   const [uncontrolledSorting, setUncontrolledSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [uncontrolledFilterValue, setUncontrolledFilterValue] = React.useState("");
+  const [uncontrolledExcludeFilterValues, setUncontrolledExcludeFilterValues] =
+    React.useState<string[]>([]);
+  const [excludeFilterInputValue, setExcludeFilterInputValue] = React.useState("");
+  const [excludeFilterErrorMessage, setExcludeFilterErrorMessage] = React.useState<
+    string | null
+  >(null);
+  const [isExcludeFilterInputVisible, setIsExcludeFilterInputVisible] =
+    React.useState(false);
   const [uncontrolledColumnVisibility, setUncontrolledColumnVisibility] =
     React.useState<VisibilityState>({});
   const sorting = controlledSorting ?? uncontrolledSorting;
   const columnVisibility = controlledColumnVisibility ?? uncontrolledColumnVisibility;
   const isFilterValueControlled = controlledFilterValue != null;
+  const isExcludeFilterValuesControlled = controlledExcludeFilterValues != null;
   const resolvedFilterValue = isFilterValueControlled
     ? controlledFilterValue
     : uncontrolledFilterValue;
+  const resolvedExcludeFilterValues = isExcludeFilterValuesControlled
+    ? controlledExcludeFilterValues
+    : uncontrolledExcludeFilterValues;
+  const hasActiveExcludeFilterValues = resolvedExcludeFilterValues.length > 0;
+
+  const handleExcludeFilterValuesChange = React.useCallback(
+    (nextExcludeFilterValues: string[]) => {
+      if (!isExcludeFilterValuesControlled) {
+        setUncontrolledExcludeFilterValues(nextExcludeFilterValues);
+      }
+
+      onExcludeFilterValuesChange?.(nextExcludeFilterValues);
+    },
+    [isExcludeFilterValuesControlled, onExcludeFilterValuesChange],
+  );
+
+  const addExcludeFilterValue = React.useCallback(() => {
+    const normalizedCandidate = normalizeFilterToken(excludeFilterInputValue);
+
+    if (!normalizedCandidate) {
+      setExcludeFilterErrorMessage(EMPTY_EXCLUDE_FILTER_ERROR_MESSAGE);
+      return;
+    }
+
+    const hasDuplicateExcludeFilter = resolvedExcludeFilterValues.some(
+      (excludeFilterValue) =>
+        normalizeFilterToken(excludeFilterValue) === normalizedCandidate,
+    );
+
+    if (hasDuplicateExcludeFilter) {
+      setExcludeFilterErrorMessage(DUPLICATE_EXCLUDE_FILTER_ERROR_MESSAGE);
+      return;
+    }
+
+    handleExcludeFilterValuesChange([
+      ...resolvedExcludeFilterValues,
+      excludeFilterInputValue.trim(),
+    ]);
+    setExcludeFilterInputValue("");
+    setExcludeFilterErrorMessage(null);
+  }, [
+    excludeFilterInputValue,
+    handleExcludeFilterValuesChange,
+    resolvedExcludeFilterValues,
+  ]);
+
+  const removeExcludeFilterValue = React.useCallback(
+    (excludeFilterValueToRemove: string) => {
+      handleExcludeFilterValuesChange(
+        resolvedExcludeFilterValues.filter(
+          (excludeFilterValue) => excludeFilterValue !== excludeFilterValueToRemove,
+        ),
+      );
+    },
+    [handleExcludeFilterValuesChange, resolvedExcludeFilterValues],
+  );
 
   const handleSortingChange = React.useCallback(
     (updater: SortingState | ((previousState: SortingState) => SortingState)) => {
@@ -226,7 +318,7 @@ export function DataTable<TData, TValue>({
                 <div className="relative w-full">
                   <Input
                     aria-label={filterLabel}
-                    className="w-full pr-9"
+                    className="w-full pr-16"
                     onChange={(event) => {
                       const nextFilterValue = event.target.value;
 
@@ -241,26 +333,117 @@ export function DataTable<TData, TValue>({
                     type="text"
                     value={resolvedFilterValue}
                   />
-                  {resolvedFilterValue ? (
-                    <Button
-                      aria-label="Limpiar filtro"
-                      className="absolute right-1 top-1/2 -translate-y-1/2 active:-translate-y-1/2"
-                      onClick={() => {
-                        if (!isFilterValueControlled) {
-                          setUncontrolledFilterValue("");
+                  <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
+                    {resolvedFilterValue ? (
+                      <Button
+                        aria-label={CLEAR_FILTER_ARIA_LABEL}
+                        className="active:-translate-y-0"
+                        onClick={() => {
+                          if (!isFilterValueControlled) {
+                            setUncontrolledFilterValue("");
+                          }
+
+                          onFilterValueChange?.("");
+                          filterColumn?.setFilterValue("");
+                        }}
+                        size="icon-xs"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <X aria-hidden="true" />
+                      </Button>
+                    ) : null}
+                    {showExcludeFilterToggle ? (
+                      <Button
+                        aria-expanded={isExcludeFilterInputVisible}
+                        aria-label={
+                          isExcludeFilterInputVisible
+                            ? HIDE_EXCLUDE_FILTERS_ARIA_LABEL
+                            : excludeFilterToggleLabel
+                        }
+                        className="relative"
+                        onClick={() => {
+                          setIsExcludeFilterInputVisible((previousState) => {
+                            const nextState = !previousState;
+
+                            if (!nextState) {
+                              setExcludeFilterInputValue("");
+                              setExcludeFilterErrorMessage(null);
+                            }
+
+                            return nextState;
+                          });
+                        }}
+                        size="icon-xs"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <Ellipsis aria-hidden="true" />
+                        {hasActiveExcludeFilterValues ? (
+                          <>
+                            <span
+                              aria-hidden="true"
+                              className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-destructive ring-2 ring-background"
+                            />
+                            <span className="sr-only">{ACTIVE_EXCLUSIONS_SR_LABEL}</span>
+                          </>
+                        ) : null}
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+                {showExcludeFilterToggle && isExcludeFilterInputVisible ? (
+                  <div className="grid gap-1">
+                    <Input
+                      aria-invalid={excludeFilterErrorMessage != null}
+                      aria-label={excludeFilterLabel}
+                      onChange={(event) => {
+                        setExcludeFilterInputValue(event.target.value);
+
+                        if (excludeFilterErrorMessage != null) {
+                          setExcludeFilterErrorMessage(null);
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key !== "Enter") {
+                          return;
                         }
 
-                        onFilterValueChange?.("");
-                        filterColumn?.setFilterValue("");
+                        event.preventDefault();
+                        addExcludeFilterValue();
                       }}
-                      size="icon-xs"
-                      type="button"
-                      variant="ghost"
-                    >
-                      <X aria-hidden="true" />
-                    </Button>
-                  ) : null}
-                </div>
+                      placeholder={excludeFilterPlaceholder}
+                      type="text"
+                      value={excludeFilterInputValue}
+                    />
+                    {excludeFilterErrorMessage ? (
+                      <p aria-live="polite" className="text-sm text-destructive">
+                        {excludeFilterErrorMessage}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+                {showExcludeFilterToggle && resolvedExcludeFilterValues.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {resolvedExcludeFilterValues.map((excludeFilterValue) => (
+                      <Badge
+                        className="inline-flex h-6 items-center gap-1.5 px-2.5"
+                        key={excludeFilterValue}
+                        variant="destructive"
+                      >
+                        <span>{`− ${excludeFilterValue}`}</span>
+                        <button
+                          aria-label={`Quitar exclusión ${excludeFilterValue}`}
+                          className="inline-flex size-4 items-center justify-center rounded-sm text-destructive transition-colors hover:bg-destructive/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40"
+                          onClick={() => removeExcludeFilterValue(excludeFilterValue)}
+                          type="button"
+                        >
+                          <X aria-hidden="true" className="size-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                ) : null}
                 {shouldShowSortingBadge ? (
                   <Badge
                     aria-live="polite"
