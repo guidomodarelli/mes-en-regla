@@ -12,51 +12,65 @@ const eslintConfig = defineConfig([
       boundaries,
     },
     rules: {
-      "boundaries/element-types": [
+      "boundaries/dependencies": [
         "error",
         {
           default: "allow",
           rules: [
             {
-              disallow: [
-                "application",
-                "client-adapters",
-                "components",
-                "infrastructure",
-                "lib",
-                "pages",
-                "shared",
-              ],
-              from: "domain",
+              from: { type: "domain" },
+              disallow: {
+                to: {
+                  type: [
+                    "application",
+                    "client-adapters",
+                    "components",
+                    "infrastructure",
+                    "lib",
+                    "pages",
+                    "shared",
+                  ],
+                },
+              },
             },
             {
-              disallow: [
-                "client-adapters",
-                "components",
-                "infrastructure",
-                "lib",
-                "pages",
-                "shared",
-              ],
-              from: "application",
+              from: { type: "application" },
+              disallow: {
+                to: {
+                  type: [
+                    "client-adapters",
+                    "components",
+                    "infrastructure",
+                    "lib",
+                    "pages",
+                    "shared",
+                  ],
+                },
+              },
             },
             {
-              disallow: [
-                "application",
-                "client-adapters",
-                "domain",
-                "infrastructure",
-                "pages",
-              ],
-              from: "components",
+              from: { type: "components" },
+              disallow: {
+                to: {
+                  type: [
+                    "application",
+                    "client-adapters",
+                    "domain",
+                    "infrastructure",
+                    "pages",
+                  ],
+                },
+              },
             },
             {
-              disallow: ["domain", "lib"],
-              from: "pages",
+              from: { type: "pages" },
+              disallow: { to: { type: ["domain", "lib"] } },
             },
             {
-              disallow: ["client-adapters", "components", "lib", "pages"],
-              from: "infrastructure",
+              from: { type: "infrastructure" },
+              disallow: {
+                to: { type: ["client-adapters", "components", "lib", "pages"] },
+              },
             },
           ],
         },

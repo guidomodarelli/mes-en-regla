@@ -2502,11 +2502,11 @@ export function MonthlyExpensesTable({
         return 0;
       }
 
-      if (!leftRank && rightRank) {
+      if (!leftRank) {
         return 1;
       }
 
-      if (leftRank && !rightRank) {
+      if (!rightRank) {
         return -1;
       }
 
