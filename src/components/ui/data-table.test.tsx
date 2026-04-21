@@ -301,4 +301,218 @@ describe("DataTable", () => {
       screen.queryByLabelText(/Filas excluidas por tarjeta:/),
     ).not.toBeInTheDocument();
   });
+
+  it("applies numeric range advanced filters from the modal", async () => {
+    const user = userEvent.setup();
+    const rows = [
+      { amount: 10, label: "Item 10", link: "", status: "none" },
+      { amount: 25, label: "Item 25", link: "https://example.com", status: "pending" },
+      { amount: 40, label: "Item 40", link: "https://example.com", status: "sent" },
+    ];
+    const columns: ColumnDef<(typeof rows)[number]>[] = [
+      {
+        accessorKey: "label",
+        header: "Descripción",
+      },
+      {
+        accessorKey: "amount",
+        cell: ({ row }) => String(row.original.amount),
+        filterFn: (row, _columnId, filterValue) => {
+          if (
+            !filterValue ||
+            typeof filterValue !== "object" ||
+            (filterValue as { kind?: string }).kind !== "numberRange"
+          ) {
+            return true;
+          }
+
+          const parsedFilterValue = filterValue as {
+            kind: "numberRange";
+            max?: number;
+            min?: number;
+          };
+          const rowAmount = row.original.amount;
+
+          if (parsedFilterValue.min != null && rowAmount < parsedFilterValue.min) {
+            return false;
+          }
+
+          if (parsedFilterValue.max != null && rowAmount > parsedFilterValue.max) {
+            return false;
+          }
+
+          return true;
+        },
+        header: "Monto",
+      },
+      {
+        accessorKey: "status",
+        header: "Estado",
+      },
+      {
+        accessorKey: "link",
+        header: "Link",
+      },
+    ];
+
+    render(
+      <DataTable
+        advancedFiltersConfig={[
+          {
+            columnId: "amount",
+            label: "Monto",
+            type: "numberRange",
+          },
+        ]}
+        columns={columns}
+        data={rows}
+        emptyMessage="Sin datos"
+        filterColumnId="label"
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Filtros avanzados" }));
+    await user.type(screen.getByRole("spinbutton", { name: "Monto Mínimo" }), "20");
+    await user.type(screen.getByRole("spinbutton", { name: "Monto Máximo" }), "30");
+    await user.click(screen.getByRole("button", { name: "Aplicar filtros" }));
+
+    expect(screen.queryByText("Item 10")).not.toBeInTheDocument();
+    expect(screen.getByText("Item 25")).toBeInTheDocument();
+    expect(screen.queryByText("Item 40")).not.toBeInTheDocument();
+    expect(screen.getByText("Filtros avanzados activos")).toBeInTheDocument();
+  });
+
+  it("renders advanced filters toggle when only advanced filters are configured", () => {
+    const rows = [{ amount: 10, label: "Item 10" }];
+    const columns: ColumnDef<(typeof rows)[number]>[] = [
+      {
+        accessorKey: "label",
+        header: "Descripción",
+      },
+      {
+        accessorKey: "amount",
+        header: "Monto",
+      },
+    ];
+
+    render(
+      <DataTable
+        advancedFiltersConfig={[
+          {
+            columnId: "amount",
+            label: "Monto",
+            type: "numberRange",
+          },
+        ]}
+        columns={columns}
+        data={rows}
+        emptyMessage="Sin datos"
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Filtros avanzados" }),
+    ).toBeInTheDocument();
+  });
+
+  it("applies and clears enum and presence advanced filters", async () => {
+    const user = userEvent.setup();
+    const rows = [
+      { label: "Sin envio", link: "", status: "none" },
+      { label: "Pendiente con link", link: "https://example.com/pending", status: "pending" },
+      { label: "Enviado con link", link: "https://example.com/sent", status: "sent" },
+    ];
+    const columns: ColumnDef<(typeof rows)[number]>[] = [
+      {
+        accessorKey: "label",
+        header: "Descripción",
+      },
+      {
+        accessorKey: "status",
+        filterFn: (row, _columnId, filterValue) => {
+          if (
+            !filterValue ||
+            typeof filterValue !== "object" ||
+            (filterValue as { kind?: string }).kind !== "enum"
+          ) {
+            return true;
+          }
+
+          return row.original.status === (filterValue as { value: string }).value;
+        },
+        header: "Estado",
+      },
+      {
+        accessorKey: "link",
+        filterFn: (row, _columnId, filterValue) => {
+          if (
+            !filterValue ||
+            typeof filterValue !== "object" ||
+            (filterValue as { kind?: string }).kind !== "presence"
+          ) {
+            return true;
+          }
+
+          const hasValue = row.original.link.trim().length > 0;
+
+          return (filterValue as { value: "hasValue" | "noValue" }).value ===
+            "hasValue"
+            ? hasValue
+            : !hasValue;
+        },
+        header: "Link",
+      },
+    ];
+
+    render(
+      <DataTable
+        advancedFiltersConfig={[
+          {
+            columnId: "status",
+            enumOptions: [
+              { label: "Pendiente", value: "pending" },
+              { label: "Enviado", value: "sent" },
+              { label: "Sin estado", value: "none" },
+            ],
+            label: "Estado",
+            type: "enum",
+          },
+          {
+            columnId: "link",
+            label: "Link",
+            type: "presence",
+          },
+        ]}
+        columns={columns}
+        data={rows}
+        emptyMessage="Sin datos"
+        filterColumnId="label"
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Filtros avanzados" }));
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Estado" }),
+      "pending",
+    );
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Link" }),
+      "hasValue",
+    );
+    await user.click(screen.getByRole("button", { name: "Aplicar filtros" }));
+
+    expect(screen.queryByText("Sin envio")).not.toBeInTheDocument();
+    expect(screen.getByText("Pendiente con link")).toBeInTheDocument();
+    expect(screen.queryByText("Enviado con link")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Filtros avanzados" }));
+    await user.click(screen.getByRole("button", { name: "Limpiar filtros" }));
+
+    expect(screen.getByText("Sin envio")).toBeInTheDocument();
+    expect(screen.getByText("Pendiente con link")).toBeInTheDocument();
+    expect(screen.getByText("Enviado con link")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Filtros avanzados activos"),
+    ).not.toBeInTheDocument();
+  });
 });

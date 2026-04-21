@@ -16,7 +16,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { DataTable } from "@/components/ui/data-table";
+import {
+  DataTable,
+  type DataTableAdvancedFilterConfig,
+  type DataTableColumnFilterValue,
+} from "@/components/ui/data-table";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -196,6 +200,87 @@ const CURRENCY_FORMATTER_BY_CURRENCY: Record<MonthlyExpenseCurrency, Intl.Number
     style: "currency",
   }),
 };
+const MONTHLY_EXPENSES_ADVANCED_FILTERS_CONFIG: DataTableAdvancedFilterConfig[] = [
+  {
+    columnId: "subtotal",
+    label: "Subtotal",
+    type: "numberRange",
+  },
+  {
+    columnId: "occurrencesPerMonth",
+    label: "por mes",
+    type: "numberRange",
+  },
+  {
+    columnId: "total",
+    label: "Total",
+    type: "numberRange",
+  },
+  {
+    columnId: "usd",
+    label: "USD",
+    type: "numberRange",
+  },
+  {
+    columnId: "paymentLink",
+    label: "Link",
+    type: "presence",
+  },
+  {
+    columnId: "receiptShareStatus",
+    enumOptions: [
+      {
+        label: "Pendiente",
+        value: "pending",
+      },
+      {
+        label: "Enviado",
+        value: "sent",
+      },
+      {
+        label: "Sin estado",
+        value: "none",
+      },
+    ],
+    label: "Estado de envío",
+    type: "enum",
+  },
+  {
+    columnId: "receiptShareLink",
+    label: "Enviar",
+    type: "presence",
+  },
+  {
+    columnId: "paymentsProgress",
+    label: "Pagos",
+    type: "numberRange",
+  },
+  {
+    columnId: "paymentHistory",
+    label: "Registro de pagos",
+    type: "numberRange",
+  },
+  {
+    columnId: LOAN_SORT_COLUMN_ID,
+    label: "Deuda / cuotas",
+    type: "presence",
+  },
+  {
+    columnId: "lenderName",
+    label: "Prestamista",
+    type: "presence",
+  },
+  {
+    columnId: LOAN_INSTALLMENT_START_COLUMN_ID,
+    label: "Inicio cuota",
+    type: "presence",
+  },
+  {
+    columnId: LOAN_INSTALLMENT_END_COLUMN_ID,
+    label: "Fin cuota",
+    type: "presence",
+  },
+];
 
 function buildLoanSortingState(direction: "asc" | "desc"): SortingState {
   return [
@@ -1122,6 +1207,78 @@ function compareValuesKeepingInvalidLast<TValue>({
     leftValue as NonNullable<TValue>,
     rightValue as NonNullable<TValue>,
   );
+}
+
+function matchesAdvancedNumberRangeFilter(
+  columnFilterValue: unknown,
+  value: number | null,
+): boolean {
+  if (
+    !columnFilterValue ||
+    typeof columnFilterValue !== "object" ||
+    (columnFilterValue as DataTableColumnFilterValue).kind !== "numberRange"
+  ) {
+    return true;
+  }
+
+  const filterValue = columnFilterValue as Extract<
+    DataTableColumnFilterValue,
+    { kind: "numberRange" }
+  >;
+
+  if (value == null || !Number.isFinite(value)) {
+    return false;
+  }
+
+  if (filterValue.min != null && value < filterValue.min) {
+    return false;
+  }
+
+  if (filterValue.max != null && value > filterValue.max) {
+    return false;
+  }
+
+  return true;
+}
+
+function matchesAdvancedPresenceFilter(
+  columnFilterValue: unknown,
+  hasValue: boolean,
+): boolean {
+  if (
+    !columnFilterValue ||
+    typeof columnFilterValue !== "object" ||
+    (columnFilterValue as DataTableColumnFilterValue).kind !== "presence"
+  ) {
+    return true;
+  }
+
+  const filterValue = columnFilterValue as Extract<
+    DataTableColumnFilterValue,
+    { kind: "presence" }
+  >;
+
+  return filterValue.value === "hasValue" ? hasValue : !hasValue;
+}
+
+function matchesAdvancedEnumFilter(
+  columnFilterValue: unknown,
+  value: string,
+): boolean {
+  if (
+    !columnFilterValue ||
+    typeof columnFilterValue !== "object" ||
+    (columnFilterValue as DataTableColumnFilterValue).kind !== "enum"
+  ) {
+    return true;
+  }
+
+  const filterValue = columnFilterValue as Extract<
+    DataTableColumnFilterValue,
+    { kind: "enum" }
+  >;
+
+  return filterValue.value === value;
 }
 
 function getReceiptShareStatusLabel(
@@ -2650,6 +2807,15 @@ export function MonthlyExpensesTable({
             </div>
           );
         },
+        filterFn: (row, _columnId, filterValue) =>
+          matchesAdvancedNumberRangeFilter(
+            filterValue,
+            getArsComparableAmount({
+              exchangeRateSnapshot,
+              rowCurrency: row.original.currency,
+              value: row.original.subtotal,
+            }),
+          ),
         header: getSortableHeader("Subtotal"),
         meta: { label: "Subtotal" },
         sortingFn: (rowA, rowB) => {
@@ -2701,6 +2867,11 @@ export function MonthlyExpensesTable({
             </div>
           );
         },
+        filterFn: (row, _columnId, filterValue) =>
+          matchesAdvancedNumberRangeFilter(
+            filterValue,
+            Number(row.original.occurrencesPerMonth),
+          ),
         header: getSortableHeader("por mes"),
         meta: { label: "por mes" },
         sortingFn: (rowA, rowB) => {
@@ -2745,6 +2916,15 @@ export function MonthlyExpensesTable({
             </span>
           );
         },
+        filterFn: (row, _columnId, filterValue) =>
+          matchesAdvancedNumberRangeFilter(
+            filterValue,
+            getArsComparableAmount({
+              exchangeRateSnapshot,
+              rowCurrency: row.original.currency,
+              value: row.original.total,
+            }),
+          ),
         header: getSortableHeader("Total"),
         meta: { label: "Total" },
         sortingFn: (rowA, rowB) => {
@@ -2786,6 +2966,16 @@ export function MonthlyExpensesTable({
 
           return formatConvertedAmount("USD", usdAmount);
         },
+        filterFn: (row, _columnId, filterValue) =>
+          matchesAdvancedNumberRangeFilter(
+            filterValue,
+            getConvertedAmountForCurrency({
+              currency: "USD",
+              exchangeRateSnapshot,
+              rowCurrency: row.original.currency,
+              total: Number(row.original.total),
+            }),
+          ),
         footer: ({ table }) => {
           const usdTotal = getConvertedTotalAmount({
             currency: "USD",
@@ -2897,6 +3087,11 @@ export function MonthlyExpensesTable({
             </div>
           );
         },
+        filterFn: (row, _columnId, filterValue) =>
+          matchesAdvancedPresenceFilter(
+            filterValue,
+            getValidPaymentLinkUrl(row.original.paymentLink) != null,
+          ),
         header: getSortableHeader("Link"),
         meta: { label: "Link" },
         sortingFn: (rowA, rowB) => {
@@ -3000,6 +3195,14 @@ export function MonthlyExpensesTable({
                 </SelectItem>
               </SelectContent>
             </Select>
+          );
+        },
+        filterFn: (row, _columnId, filterValue) => {
+          const normalizedStatus = getNormalizedReceiptShareStatus(row.original);
+
+          return matchesAdvancedEnumFilter(
+            filterValue,
+            normalizedStatus ?? "none",
           );
         },
         header: getSortableHeader("Estado de envío"),
@@ -3115,6 +3318,11 @@ export function MonthlyExpensesTable({
             </div>
           );
         },
+        filterFn: (row, _columnId, filterValue) =>
+          matchesAdvancedPresenceFilter(
+            filterValue,
+            getReceiptShareWhatsAppLink(row.original) != null,
+          ),
         header: getSortableHeader("Enviar"),
         meta: { label: "Enviar" },
         sortingFn: (rowA, rowB) => {
@@ -3178,6 +3386,14 @@ export function MonthlyExpensesTable({
             </Badge>
           );
         },
+        filterFn: (row, _columnId, filterValue) => {
+          const paymentProgress = getPaymentProgress(row.original);
+
+          return matchesAdvancedNumberRangeFilter(
+            filterValue,
+            paymentProgress.coveredPayments,
+          );
+        },
         header: getSortableHeader("Pagos"),
         meta: { label: "Pagos" },
         sortingFn: (rowA, rowB) => {
@@ -3239,6 +3455,11 @@ export function MonthlyExpensesTable({
             />
           );
         },
+        filterFn: (row, _columnId, filterValue) =>
+          matchesAdvancedNumberRangeFilter(
+            filterValue,
+            (row.original.paymentRecords ?? []).length,
+          ),
         header: getSortableHeader("Registro de pagos"),
         meta: { label: "Registro de pagos" },
         sortingFn: (rowA, rowB) => {
@@ -3277,6 +3498,11 @@ export function MonthlyExpensesTable({
             </div>
           );
         },
+        filterFn: (row, _columnId, filterValue) =>
+          matchesAdvancedPresenceFilter(
+            filterValue,
+            row.original.isLoan && row.original.loanProgress.trim().length > 0,
+          ),
         header: ({ column }) => (
           <LoanSortColumnHeader
             column={column}
@@ -3331,6 +3557,11 @@ export function MonthlyExpensesTable({
 
           return lenderName.length > 0 ? lenderName : "-";
         },
+        filterFn: (row, _columnId, filterValue) =>
+          matchesAdvancedPresenceFilter(
+            filterValue,
+            row.original.lenderName.trim().length > 0,
+          ),
         header: getSortableHeader("Prestamista"),
         meta: { label: "Prestamista" },
         sortingFn: (rowA, rowB) => {
@@ -3358,6 +3589,11 @@ export function MonthlyExpensesTable({
         id: LOAN_INSTALLMENT_START_COLUMN_ID,
         accessorFn: (row) => row.startMonth,
         cell: ({ row }) => formatYearMonth(row.original.startMonth),
+        filterFn: (row, _columnId, filterValue) =>
+          matchesAdvancedPresenceFilter(
+            filterValue,
+            parseYearMonth(row.original.startMonth) != null,
+          ),
         header: getSortableHeader("Inicio cuota"),
         meta: { label: "Inicio cuota" },
         sortingFn: (rowA, rowB) => {
@@ -3396,6 +3632,11 @@ export function MonthlyExpensesTable({
         id: LOAN_INSTALLMENT_END_COLUMN_ID,
         accessorFn: (row) => row.loanEndMonth,
         cell: ({ row }) => formatYearMonth(row.original.loanEndMonth),
+        filterFn: (row, _columnId, filterValue) =>
+          matchesAdvancedPresenceFilter(
+            filterValue,
+            parseYearMonth(row.original.loanEndMonth) != null,
+          ),
         header: getSortableHeader("Fin cuota"),
         meta: { label: "Fin cuota" },
         sortingFn: (rowA, rowB) => {
@@ -3687,6 +3928,12 @@ export function MonthlyExpensesTable({
               </div>
             ) : null}
             <DataTable
+              advancedFiltersButtonLabel="Filtros avanzados"
+              advancedFiltersConfig={MONTHLY_EXPENSES_ADVANCED_FILTERS_CONFIG}
+              advancedFiltersDescription="Aplicá filtros por columna para acotar los resultados."
+              advancedFiltersDialogTitle="Filtros avanzados"
+              applyAdvancedFiltersLabel="Aplicar"
+              clearAdvancedFiltersLabel="Limpiar"
               columnVisibility={columnVisibility}
               columnVisibilityButtonLabel="Columnas"
               columnVisibilityMenuLabel="Mostrar columnas"

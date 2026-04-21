@@ -15,10 +15,18 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { CircleAlert, ChevronDown, Ellipsis, Eraser, X } from "lucide-react";
+import { CircleAlert, ChevronDown, Ellipsis, Eraser, Filter, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -38,6 +46,52 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+type PresenceFilterValue = "hasValue" | "noValue";
+
+export type DataTableAdvancedFilterType = "numberRange" | "enum" | "presence";
+
+export interface DataTableAdvancedEnumOption {
+  label: string;
+  value: string;
+}
+
+export interface DataTableAdvancedFilterConfig {
+  columnId: string;
+  label: string;
+  type: DataTableAdvancedFilterType;
+  enumOptions?: DataTableAdvancedEnumOption[];
+}
+
+export type DataTableColumnFilterValue =
+  | {
+      kind: "numberRange";
+      max?: number;
+      min?: number;
+    }
+  | {
+      kind: "enum";
+      value: string;
+    }
+  | {
+      kind: "presence";
+      value: PresenceFilterValue;
+    };
+
+type DataTableAdvancedFilterDraftValue =
+  | {
+      kind: "numberRange";
+      max: string;
+      min: string;
+    }
+  | {
+      kind: "enum";
+      value: string;
+    }
+  | {
+      kind: "presence";
+      value: PresenceFilterValue | "";
+    };
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -68,6 +122,12 @@ interface DataTableProps<TData, TValue> {
   selectAllColumnsLabel?: string;
   deselectAllColumnsLabel?: string;
   hideableColumnsDefaultVisibility?: VisibilityState;
+  advancedFiltersConfig?: DataTableAdvancedFilterConfig[];
+  advancedFiltersButtonLabel?: string;
+  advancedFiltersDescription?: string;
+  advancedFiltersDialogTitle?: string;
+  clearAdvancedFiltersLabel?: string;
+  applyAdvancedFiltersLabel?: string;
 }
 
 interface DataTableColumnMeta {
@@ -86,6 +146,20 @@ const CLEAR_ALL_EXCLUSIONS_ARIA_LABEL = "Quitar todas las exclusiones";
 const CLEAR_ALL_EXCLUSIONS_FROM_INPUT_ARIA_LABEL = "Limpiar filtros excluidos";
 const REVERSE_FILTER_PENDING_MESSAGE =
   "Estás escribiendo una exclusión. Presioná Enter para aplicarla.";
+const ADVANCED_FILTERS_ICON_LABEL = "Filtros avanzados";
+const ADVANCED_FILTERS_ACTIVE_SR_LABEL = "Filtros avanzados activos";
+const ADVANCED_FILTERS_DIALOG_CANCEL_LABEL = "Cancelar";
+const ADVANCED_FILTERS_NUMBER_MIN_LABEL = "Mínimo";
+const ADVANCED_FILTERS_NUMBER_MAX_LABEL = "Máximo";
+const ADVANCED_FILTERS_ENUM_ALL_OPTION = "Todos";
+const ADVANCED_FILTERS_PRESENCE_ALL_OPTION = "Todos";
+const ADVANCED_FILTERS_PRESENCE_HAS_OPTION = "Tiene valor";
+const ADVANCED_FILTERS_PRESENCE_HAS_NOT_OPTION = "Sin valor";
+const ADVANCED_FILTERS_INVALID_MIN_MESSAGE = "Ingresá un mínimo válido.";
+const ADVANCED_FILTERS_INVALID_MAX_MESSAGE = "Ingresá un máximo válido.";
+const ADVANCED_FILTERS_INVALID_RANGE_MESSAGE =
+  "El mínimo no puede ser mayor que el máximo.";
+const EMPTY_ADVANCED_FILTERS_CONFIG: DataTableAdvancedFilterConfig[] = [];
 
 function normalizeFilterToken(value: string): string {
   return value
@@ -106,6 +180,69 @@ function getTableFilterValue(
   }
 
   return filterValue;
+}
+
+function getDefaultAdvancedFilterDraftValue(
+  filterType: DataTableAdvancedFilterType,
+): DataTableAdvancedFilterDraftValue {
+  if (filterType === "numberRange") {
+    return {
+      kind: "numberRange",
+      max: "",
+      min: "",
+    };
+  }
+
+  if (filterType === "enum") {
+    return {
+      kind: "enum",
+      value: "",
+    };
+  }
+
+  return {
+    kind: "presence",
+    value: "",
+  };
+}
+
+function parseNullableNumber(value: string): number | null {
+  const normalizedValue = value.trim();
+
+  if (!normalizedValue) {
+    return null;
+  }
+
+  const parsedValue = Number(normalizedValue);
+
+  return Number.isFinite(parsedValue) ? parsedValue : null;
+}
+
+function isAdvancedFilterDraftValueActive(
+  filterValue: DataTableAdvancedFilterDraftValue,
+): boolean {
+  if (filterValue.kind === "numberRange") {
+    return (
+      filterValue.min.trim().length > 0 || filterValue.max.trim().length > 0
+    );
+  }
+
+  return filterValue.value !== "";
+}
+
+function areColumnFiltersEqual(
+  leftFilters: ColumnFiltersState,
+  rightFilters: ColumnFiltersState,
+): boolean {
+  if (leftFilters.length !== rightFilters.length) {
+    return false;
+  }
+
+  return leftFilters.every(
+    (leftFilter, index) =>
+      leftFilter.id === rightFilters[index]?.id &&
+      leftFilter.value === rightFilters[index]?.value,
+  );
 }
 
 export function DataTable<TData, TValue>({
@@ -137,6 +274,12 @@ export function DataTable<TData, TValue>({
   selectAllColumnsLabel = "Mostrar todas",
   deselectAllColumnsLabel = "Ocultar todas",
   hideableColumnsDefaultVisibility,
+  advancedFiltersConfig = EMPTY_ADVANCED_FILTERS_CONFIG,
+  advancedFiltersButtonLabel = ADVANCED_FILTERS_ICON_LABEL,
+  advancedFiltersDescription = "Aplicá filtros por columna.",
+  advancedFiltersDialogTitle = "Filtros avanzados",
+  clearAdvancedFiltersLabel = "Limpiar filtros",
+  applyAdvancedFiltersLabel = "Aplicar filtros",
 }: DataTableProps<TData, TValue>) {
   const [uncontrolledSorting, setUncontrolledSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -151,6 +294,12 @@ export function DataTable<TData, TValue>({
     React.useState(false);
   const [uncontrolledColumnVisibility, setUncontrolledColumnVisibility] =
     React.useState<VisibilityState>({});
+  const [isAdvancedFiltersDialogOpen, setIsAdvancedFiltersDialogOpen] =
+    React.useState(false);
+  const [advancedFiltersDraftByColumn, setAdvancedFiltersDraftByColumn] =
+    React.useState<Record<string, DataTableAdvancedFilterDraftValue>>({});
+  const [advancedFiltersAppliedByColumn, setAdvancedFiltersAppliedByColumn] =
+    React.useState<Record<string, DataTableColumnFilterValue>>({});
   const sorting = controlledSorting ?? uncontrolledSorting;
   const columnVisibility = controlledColumnVisibility ?? uncontrolledColumnVisibility;
   const isFilterValueControlled = controlledFilterValue != null;
@@ -168,6 +317,15 @@ export function DataTable<TData, TValue>({
   );
   const hasPendingReverseFilter =
     showExcludeFilterToggle && resolvedFilterValue.trimStart().startsWith("-");
+  const advancedFilterColumnIds = React.useMemo(
+    () =>
+      new Set(
+        advancedFiltersConfig.map((advancedFilterConfig) => advancedFilterConfig.columnId),
+      ),
+    [advancedFiltersConfig],
+  );
+  const hasActiveAdvancedFilters =
+    Object.keys(advancedFiltersAppliedByColumn).length > 0;
 
   const handleExcludeFilterValuesChange = React.useCallback(
     (nextExcludeFilterValues: string[]) => {
@@ -300,8 +458,15 @@ export function DataTable<TData, TValue>({
   const hasModifiedColumnVisibility =
     shouldShowColumnVisibilityToggle && !areHideableColumnsAtDefaultVisibility;
   const hasToolbarChanges = hasModifiedColumnVisibility;
-  const shouldShowToolbarActions = shouldShowColumnVisibilityToggle;
-  const shouldShowToolbar = Boolean(filterColumnId) || shouldShowToolbarActions;
+  const shouldShowAdvancedFiltersToggle = advancedFiltersConfig.length > 0;
+  const shouldShowStandaloneAdvancedFiltersToggle =
+    shouldShowAdvancedFiltersToggle && !filterColumnId;
+  const shouldShowToolbarActions =
+    shouldShowColumnVisibilityToggle || shouldShowStandaloneAdvancedFiltersToggle;
+  const shouldShowToolbar =
+    Boolean(filterColumnId) ||
+    shouldShowToolbarActions ||
+    shouldShowAdvancedFiltersToggle;
   const filterColumn = filterColumnId ? table.getColumn(filterColumnId) : undefined;
   const activeSortingEntry = sorting[0];
   const activeSortingColumn = activeSortingEntry
@@ -357,6 +522,185 @@ export function DataTable<TData, TValue>({
 
     filterColumn.setFilterValue(tableFilterValue);
   }, [filterColumn, tableFilterValue]);
+
+  React.useEffect(() => {
+    if (
+      advancedFilterColumnIds.size === 0 &&
+      Object.keys(advancedFiltersAppliedByColumn).length === 0
+    ) {
+      return;
+    }
+
+    setColumnFilters((previousColumnFilters) => {
+      const nextColumnFilters = previousColumnFilters.filter(
+        (columnFilter) => !advancedFilterColumnIds.has(columnFilter.id),
+      );
+
+      for (const [columnId, filterValue] of Object.entries(
+        advancedFiltersAppliedByColumn,
+      )) {
+        nextColumnFilters.push({
+          id: columnId,
+          value: filterValue,
+        });
+      }
+
+      if (areColumnFiltersEqual(previousColumnFilters, nextColumnFilters)) {
+        return previousColumnFilters;
+      }
+
+      return nextColumnFilters;
+    });
+  }, [advancedFilterColumnIds, advancedFiltersAppliedByColumn]);
+
+  const advancedFilterValidationMessagesByColumn = React.useMemo(() => {
+    const nextValidationMessagesByColumn: Record<string, string> = {};
+
+    for (const advancedFilterConfig of advancedFiltersConfig) {
+      const draftValue =
+        advancedFiltersDraftByColumn[advancedFilterConfig.columnId] ??
+        getDefaultAdvancedFilterDraftValue(advancedFilterConfig.type);
+
+      if (advancedFilterConfig.type !== "numberRange" || draftValue.kind !== "numberRange") {
+        continue;
+      }
+
+      const hasMinValue = draftValue.min.trim().length > 0;
+      const hasMaxValue = draftValue.max.trim().length > 0;
+      const parsedMin = parseNullableNumber(draftValue.min);
+      const parsedMax = parseNullableNumber(draftValue.max);
+
+      if (hasMinValue && parsedMin == null) {
+        nextValidationMessagesByColumn[advancedFilterConfig.columnId] =
+          ADVANCED_FILTERS_INVALID_MIN_MESSAGE;
+        continue;
+      }
+
+      if (hasMaxValue && parsedMax == null) {
+        nextValidationMessagesByColumn[advancedFilterConfig.columnId] =
+          ADVANCED_FILTERS_INVALID_MAX_MESSAGE;
+        continue;
+      }
+
+      if (parsedMin != null && parsedMax != null && parsedMin > parsedMax) {
+        nextValidationMessagesByColumn[advancedFilterConfig.columnId] =
+          ADVANCED_FILTERS_INVALID_RANGE_MESSAGE;
+      }
+    }
+
+    return nextValidationMessagesByColumn;
+  }, [advancedFiltersConfig, advancedFiltersDraftByColumn]);
+  const hasAdvancedFilterValidationErrors =
+    Object.keys(advancedFilterValidationMessagesByColumn).length > 0;
+
+  const handleOpenAdvancedFiltersDialog = React.useCallback(() => {
+    const nextDraftByColumn: Record<string, DataTableAdvancedFilterDraftValue> = {};
+
+    for (const advancedFilterConfig of advancedFiltersConfig) {
+      const appliedFilterValue = advancedFiltersAppliedByColumn[advancedFilterConfig.columnId];
+
+      if (advancedFilterConfig.type === "numberRange") {
+        nextDraftByColumn[advancedFilterConfig.columnId] = {
+          kind: "numberRange",
+          max:
+            appliedFilterValue?.kind === "numberRange" &&
+            appliedFilterValue.max != null
+              ? String(appliedFilterValue.max)
+              : "",
+          min:
+            appliedFilterValue?.kind === "numberRange" &&
+            appliedFilterValue.min != null
+              ? String(appliedFilterValue.min)
+              : "",
+        };
+        continue;
+      }
+
+      if (advancedFilterConfig.type === "enum") {
+        nextDraftByColumn[advancedFilterConfig.columnId] = {
+          kind: "enum",
+          value:
+            appliedFilterValue?.kind === "enum"
+              ? appliedFilterValue.value
+              : "",
+        };
+        continue;
+      }
+
+      nextDraftByColumn[advancedFilterConfig.columnId] = {
+        kind: "presence",
+        value:
+          appliedFilterValue?.kind === "presence"
+            ? appliedFilterValue.value
+            : "",
+      };
+    }
+
+    setAdvancedFiltersDraftByColumn(nextDraftByColumn);
+    setIsAdvancedFiltersDialogOpen(true);
+  }, [advancedFiltersAppliedByColumn, advancedFiltersConfig]);
+
+  const handleApplyAdvancedFilters = React.useCallback(() => {
+    if (hasAdvancedFilterValidationErrors) {
+      return;
+    }
+
+    const nextAppliedFiltersByColumn: Record<string, DataTableColumnFilterValue> = {};
+
+    for (const advancedFilterConfig of advancedFiltersConfig) {
+      const draftFilterValue =
+        advancedFiltersDraftByColumn[advancedFilterConfig.columnId] ??
+        getDefaultAdvancedFilterDraftValue(advancedFilterConfig.type);
+
+      if (!isAdvancedFilterDraftValueActive(draftFilterValue)) {
+        continue;
+      }
+
+      if (draftFilterValue.kind === "numberRange") {
+        const parsedMin = parseNullableNumber(draftFilterValue.min);
+        const parsedMax = parseNullableNumber(draftFilterValue.max);
+
+        if (parsedMin == null && parsedMax == null) {
+          continue;
+        }
+
+        nextAppliedFiltersByColumn[advancedFilterConfig.columnId] = {
+          kind: "numberRange",
+          ...(parsedMax != null ? { max: parsedMax } : {}),
+          ...(parsedMin != null ? { min: parsedMin } : {}),
+        };
+        continue;
+      }
+
+      if (draftFilterValue.kind === "enum" && draftFilterValue.value) {
+        nextAppliedFiltersByColumn[advancedFilterConfig.columnId] = {
+          kind: "enum",
+          value: draftFilterValue.value,
+        };
+        continue;
+      }
+
+      if (draftFilterValue.kind === "presence" && draftFilterValue.value) {
+        nextAppliedFiltersByColumn[advancedFilterConfig.columnId] = {
+          kind: "presence",
+          value: draftFilterValue.value,
+        };
+      }
+    }
+
+    setAdvancedFiltersAppliedByColumn(nextAppliedFiltersByColumn);
+    setIsAdvancedFiltersDialogOpen(false);
+  }, [
+    advancedFiltersConfig,
+    advancedFiltersDraftByColumn,
+    hasAdvancedFilterValidationErrors,
+  ]);
+
+  const handleClearAdvancedFilters = React.useCallback(() => {
+    setAdvancedFiltersDraftByColumn({});
+    setAdvancedFiltersAppliedByColumn({});
+    setIsAdvancedFiltersDialogOpen(false);
+  }, []);
 
   return (
     <div className="grid gap-4">
@@ -462,6 +806,27 @@ export function DataTable<TData, TValue>({
                               className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-destructive ring-2 ring-background"
                             />
                             <span className="sr-only">{ACTIVE_EXCLUSIONS_SR_LABEL}</span>
+                          </>
+                        ) : null}
+                      </Button>
+                    ) : null}
+                    {shouldShowAdvancedFiltersToggle ? (
+                      <Button
+                        aria-label={advancedFiltersButtonLabel}
+                        className="relative"
+                        onClick={handleOpenAdvancedFiltersDialog}
+                        size="icon-xs"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <Filter aria-hidden="true" />
+                        {hasActiveAdvancedFilters ? (
+                          <>
+                            <span
+                              aria-hidden="true"
+                              className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-destructive ring-2 ring-background"
+                            />
+                            <span className="sr-only">{ADVANCED_FILTERS_ACTIVE_SR_LABEL}</span>
                           </>
                         ) : null}
                       </Button>
@@ -606,6 +971,27 @@ export function DataTable<TData, TValue>({
 
             {shouldShowToolbarActions ? (
               <div className="ml-auto flex flex-wrap items-center gap-2">
+                {shouldShowStandaloneAdvancedFiltersToggle ? (
+                  <Button
+                    aria-label={advancedFiltersButtonLabel}
+                    className="relative"
+                    onClick={handleOpenAdvancedFiltersDialog}
+                    size="icon-xs"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <Filter aria-hidden="true" />
+                    {hasActiveAdvancedFilters ? (
+                      <>
+                        <span
+                          aria-hidden="true"
+                          className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-destructive ring-2 ring-background"
+                        />
+                        <span className="sr-only">{ADVANCED_FILTERS_ACTIVE_SR_LABEL}</span>
+                      </>
+                    ) : null}
+                  </Button>
+                ) : null}
                 {shouldShowColumnVisibilityToggle ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -771,6 +1157,157 @@ export function DataTable<TData, TValue>({
           ) : null}
         </Table>
       </div>
+
+      {shouldShowAdvancedFiltersToggle ? (
+        <Dialog onOpenChange={setIsAdvancedFiltersDialogOpen} open={isAdvancedFiltersDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{advancedFiltersDialogTitle}</DialogTitle>
+              <DialogDescription>{advancedFiltersDescription}</DialogDescription>
+            </DialogHeader>
+            <div className="grid max-h-[60vh] gap-4 overflow-y-auto pr-1">
+              {advancedFiltersConfig.map((advancedFilterConfig) => {
+                const draftFilterValue =
+                  advancedFiltersDraftByColumn[advancedFilterConfig.columnId] ??
+                  getDefaultAdvancedFilterDraftValue(advancedFilterConfig.type);
+                const columnValidationMessage =
+                  advancedFilterValidationMessagesByColumn[advancedFilterConfig.columnId];
+
+                return (
+                  <div className="grid gap-2" key={advancedFilterConfig.columnId}>
+                    <p className="text-sm font-medium">{advancedFilterConfig.label}</p>
+
+                    {advancedFilterConfig.type === "numberRange" &&
+                    draftFilterValue.kind === "numberRange" ? (
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <Input
+                          aria-label={`${advancedFilterConfig.label} ${ADVANCED_FILTERS_NUMBER_MIN_LABEL}`}
+                          onChange={(event) => {
+                            const nextValue = event.target.value;
+
+                            setAdvancedFiltersDraftByColumn((previousState) => ({
+                              ...previousState,
+                              [advancedFilterConfig.columnId]: {
+                                kind: "numberRange",
+                                max:
+                                  previousState[advancedFilterConfig.columnId]?.kind ===
+                                  "numberRange"
+                                    ? previousState[advancedFilterConfig.columnId].max
+                                    : "",
+                                min: nextValue,
+                              },
+                            }));
+                          }}
+                          placeholder={ADVANCED_FILTERS_NUMBER_MIN_LABEL}
+                          type="number"
+                          value={draftFilterValue.min}
+                        />
+                        <Input
+                          aria-label={`${advancedFilterConfig.label} ${ADVANCED_FILTERS_NUMBER_MAX_LABEL}`}
+                          onChange={(event) => {
+                            const nextValue = event.target.value;
+
+                            setAdvancedFiltersDraftByColumn((previousState) => ({
+                              ...previousState,
+                              [advancedFilterConfig.columnId]: {
+                                kind: "numberRange",
+                                max: nextValue,
+                                min:
+                                  previousState[advancedFilterConfig.columnId]?.kind ===
+                                  "numberRange"
+                                    ? previousState[advancedFilterConfig.columnId].min
+                                    : "",
+                              },
+                            }));
+                          }}
+                          placeholder={ADVANCED_FILTERS_NUMBER_MAX_LABEL}
+                          type="number"
+                          value={draftFilterValue.max}
+                        />
+                      </div>
+                    ) : null}
+
+                    {advancedFilterConfig.type === "enum" && draftFilterValue.kind === "enum" ? (
+                      <select
+                        aria-label={advancedFilterConfig.label}
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                        onChange={(event) => {
+                          const nextValue = event.target.value;
+
+                          setAdvancedFiltersDraftByColumn((previousState) => ({
+                            ...previousState,
+                            [advancedFilterConfig.columnId]: {
+                              kind: "enum",
+                              value: nextValue,
+                            },
+                          }));
+                        }}
+                        value={draftFilterValue.value}
+                      >
+                        <option value="">{ADVANCED_FILTERS_ENUM_ALL_OPTION}</option>
+                        {(advancedFilterConfig.enumOptions ?? []).map((enumOption) => (
+                          <option key={enumOption.value} value={enumOption.value}>
+                            {enumOption.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : null}
+
+                    {advancedFilterConfig.type === "presence" &&
+                    draftFilterValue.kind === "presence" ? (
+                      <select
+                        aria-label={advancedFilterConfig.label}
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                        onChange={(event) => {
+                          const nextValue = event.target.value as PresenceFilterValue | "";
+
+                          setAdvancedFiltersDraftByColumn((previousState) => ({
+                            ...previousState,
+                            [advancedFilterConfig.columnId]: {
+                              kind: "presence",
+                              value: nextValue,
+                            },
+                          }));
+                        }}
+                        value={draftFilterValue.value}
+                      >
+                        <option value="">{ADVANCED_FILTERS_PRESENCE_ALL_OPTION}</option>
+                        <option value="hasValue">{ADVANCED_FILTERS_PRESENCE_HAS_OPTION}</option>
+                        <option value="noValue">
+                          {ADVANCED_FILTERS_PRESENCE_HAS_NOT_OPTION}
+                        </option>
+                      </select>
+                    ) : null}
+
+                    {columnValidationMessage ? (
+                      <p className="text-sm text-destructive">{columnValidationMessage}</p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+            <DialogFooter>
+              <Button
+                onClick={() => setIsAdvancedFiltersDialogOpen(false)}
+                type="button"
+                variant="outline"
+              >
+                {ADVANCED_FILTERS_DIALOG_CANCEL_LABEL}
+              </Button>
+              <Button onClick={handleClearAdvancedFilters} type="button" variant="outline">
+                {clearAdvancedFiltersLabel}
+              </Button>
+              <Button
+                disabled={hasAdvancedFilterValidationErrors}
+                onClick={handleApplyAdvancedFilters}
+                type="button"
+              >
+                {applyAdvancedFiltersLabel}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </div>
   );
 }

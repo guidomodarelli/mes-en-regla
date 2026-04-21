@@ -283,6 +283,77 @@ registerMonthlyExpensesPageDefaultHooks({
     });
   });
 
+  it("filters rows with advanced modal filters for numeric range, enum status, and presence", async () => {
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <MonthlyExpensesPage
+        {...basePageProps}
+        initialDocument={{
+          items: [
+            {
+              currency: "ARS",
+              description: "Pendiente con link",
+              id: "expense-1",
+              occurrencesPerMonth: 1,
+              paymentLink: "https://pagos.example.com/pending",
+              receiptShareStatus: "pending",
+              requiresReceiptShare: true,
+              subtotal: 100,
+              total: 100,
+            },
+            {
+              currency: "ARS",
+              description: "Enviado sin link",
+              id: "expense-2",
+              occurrencesPerMonth: 1,
+              paymentLink: null,
+              receiptShareStatus: "sent",
+              requiresReceiptShare: true,
+              subtotal: 200,
+              total: 200,
+            },
+            {
+              currency: "ARS",
+              description: "Sin estado sin link",
+              id: "expense-3",
+              occurrencesPerMonth: 1,
+              paymentLink: null,
+              requiresReceiptShare: false,
+              subtotal: 300,
+              total: 300,
+            },
+          ],
+          month: "2026-03",
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Filtros avanzados" }));
+    await user.type(screen.getByRole("spinbutton", { name: "Subtotal Mínimo" }), "150");
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Estado de envío" }),
+      "sent",
+    );
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Link" }),
+      "noValue",
+    );
+    await user.click(screen.getByRole("button", { name: "Aplicar" }));
+
+    expect(screen.queryByText("Pendiente con link")).not.toBeInTheDocument();
+    expect(screen.getByText("Enviado sin link")).toBeInTheDocument();
+    expect(screen.queryByText("Sin estado sin link")).not.toBeInTheDocument();
+    expect(screen.getByText("Filtros avanzados activos")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Filtros avanzados" }));
+    await user.click(screen.getByRole("button", { name: "Limpiar" }));
+
+    expect(screen.getByText("Pendiente con link")).toBeInTheDocument();
+    expect(screen.getByText("Enviado sin link")).toBeInTheDocument();
+    expect(screen.getByText("Sin estado sin link")).toBeInTheDocument();
+  });
+
   it("allows selecting and deselecting all hideable columns from the selector", async () => {
     const user = userEvent.setup();
 
