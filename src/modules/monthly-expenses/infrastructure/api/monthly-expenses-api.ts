@@ -301,6 +301,13 @@ export class MonthlyExpensesApiError extends Error {
   }
 }
 
+export class MonthlyExpensesAuthenticationError extends MonthlyExpensesApiError {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "MonthlyExpensesAuthenticationError";
+  }
+}
+
 export interface SaveMonthlyExpensesDocumentApiResult {
   receiptRenameWarnings: Array<{
     fileId: string;
@@ -340,12 +347,15 @@ export async function saveMonthlyExpensesDocumentViaApi(
     const responseJson = await response.json();
     const parsedError =
       monthlyExpensesErrorEnvelopeSchema.safeParse(responseJson);
+    const errorMessage = parsedError.success
+      ? parsedError.data.error
+      : "monthly-expenses-api:/api/storage/monthly-expenses returned an unexpected error response.";
 
-    throw new MonthlyExpensesApiError(
-      parsedError.success
-        ? parsedError.data.error
-        : "monthly-expenses-api:/api/storage/monthly-expenses returned an unexpected error response.",
-    );
+    if (response.status === 401) {
+      throw new MonthlyExpensesAuthenticationError(errorMessage);
+    }
+
+    throw new MonthlyExpensesApiError(errorMessage);
   }
 
   if (response.status === 204) {
@@ -409,12 +419,15 @@ export async function getMonthlyExpensesDocumentViaApi(
 
   if (!response.ok) {
     const parsedError = monthlyExpensesErrorEnvelopeSchema.safeParse(responseJson);
+    const errorMessage = parsedError.success
+      ? parsedError.data.error
+      : "monthly-expenses-api:/api/storage/monthly-expenses returned an unexpected error response.";
 
-    throw new MonthlyExpensesApiError(
-      parsedError.success
-        ? parsedError.data.error
-        : "monthly-expenses-api:/api/storage/monthly-expenses returned an unexpected error response.",
-    );
+    if (response.status === 401) {
+      throw new MonthlyExpensesAuthenticationError(errorMessage);
+    }
+
+    throw new MonthlyExpensesApiError(errorMessage);
   }
 
   return monthlyExpensesDocumentEnvelopeSchema.parse(responseJson)

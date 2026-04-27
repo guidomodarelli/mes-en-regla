@@ -1,5 +1,6 @@
 import {
   getMonthlyExpensesDocumentViaApi,
+  MonthlyExpensesAuthenticationError,
   saveMonthlyExpensesDocumentViaApi,
 } from "./monthly-expenses-api";
 
@@ -229,5 +230,33 @@ describe("monthly-expenses-api client", () => {
         viewUrl: null,
       },
     });
+  });
+
+  it("throws MonthlyExpensesAuthenticationError when POST responds with 401", async () => {
+    const fetchImplementation = jest.fn().mockResolvedValue({
+      json: async () => ({
+        error: "Google authentication is required before saving monthly expenses.",
+      }),
+      ok: false,
+      status: 401,
+    });
+
+    await expect(
+      saveMonthlyExpensesDocumentViaApi(
+        {
+          items: [
+            {
+              currency: "ARS",
+              description: "Internet",
+              id: "expense-1",
+              occurrencesPerMonth: 1,
+              subtotal: 45,
+            },
+          ],
+          month: "2026-03",
+        },
+        fetchImplementation,
+      ),
+    ).rejects.toBeInstanceOf(MonthlyExpensesAuthenticationError);
   });
 });

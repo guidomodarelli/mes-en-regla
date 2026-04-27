@@ -12,6 +12,7 @@ jest.mock("next/router", () => ({
 
 jest.mock("next-auth/react", () => ({
   signIn: jest.fn(),
+  signOut: jest.fn(),
   useSession: jest.fn(),
 }));
 

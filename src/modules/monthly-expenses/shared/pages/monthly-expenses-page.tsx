@@ -3,7 +3,7 @@ import type {
 } from "next";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { toast } from "sonner";
 
 import { FinanceAppShell } from "@/components/finance-app-shell/finance-app-shell";
@@ -68,6 +68,7 @@ import {
 } from "@/modules/monthly-expenses/infrastructure/api/monthly-expenses-copyable-months-api";
 import {
   getMonthlyExpensesDocumentViaApi,
+  MonthlyExpensesAuthenticationError,
   saveMonthlyExpensesDocumentViaApi,
 } from "../../infrastructure/api/monthly-expenses-api";
 import {
@@ -1431,6 +1432,7 @@ export default function MonthlyExpensesPage({
   const [isMonthTransitionPending, setIsMonthTransitionPending] = useState(false);
   const [pendingMonth, setPendingMonth] = useState<string | null>(null);
   const shouldIgnoreNextExpenseSheetCloseRef = useRef(false);
+  const isReauthenticationInProgressRef = useRef(false);
   const latestMonthLoadRequestIdRef = useRef(0);
 
   const isAuthenticated = status === "authenticated";
@@ -1520,6 +1522,36 @@ export default function MonthlyExpensesPage({
   ) => {
     setReportState((currentState) => updater(currentState));
   };
+
+  const handleAuthenticationRecovery = useCallback(
+    async (error: unknown) => {
+      if (!(error instanceof MonthlyExpensesAuthenticationError)) {
+        return false;
+      }
+
+      updateFormState((currentState) => ({
+        ...currentState,
+        error: "Tu sesion de Google vencio. Inicia sesion de nuevo para seguir guardando.",
+        isSubmitting: false,
+      }));
+      toast.warning("Tu sesion vencio. Te redirigimos para iniciar sesion nuevamente.");
+
+      if (isReauthenticationInProgressRef.current) {
+        return true;
+      }
+
+      isReauthenticationInProgressRef.current = true;
+
+      await signOut({
+        callbackUrl: `/auth/signin?callbackUrl=${encodeURIComponent(
+          `/compromisos?month=${formState.month}`,
+        )}`,
+      });
+
+      return true;
+    },
+    [formState.month],
+  );
   const updateExpenseSheetState = (
     updater: (currentState: ExpenseSheetState) => ExpenseSheetState,
   ) => {
@@ -1804,7 +1836,10 @@ export default function MonthlyExpensesPage({
         void toast.promise(
           savePromise,
           {
-            error: "No pudimos guardar los compromisos mensuales.",
+            error: (error) =>
+              error instanceof MonthlyExpensesAuthenticationError
+                ? "Tu sesion vencio. Te redirigimos para iniciar sesion nuevamente."
+                : "No pudimos guardar los compromisos mensuales.",
             loading: toastMessages.loading,
             success: toastMessages.success,
           },
@@ -1828,6 +1863,14 @@ export default function MonthlyExpensesPage({
       await refreshLoansReport();
       return true;
     } catch (error) {
+      if (await handleAuthenticationRecovery(error)) {
+        if (throwOnError) {
+          throw error;
+        }
+
+        return false;
+      }
+
       updateFormState((currentState) => ({
         ...currentState,
         error: getSafeMonthlyExpensesErrorMessage(error),

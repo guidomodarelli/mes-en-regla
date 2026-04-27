@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
-import { signIn, useSession } from "next-auth/react";
+import { signIn, signOut, useSession } from "next-auth/react";
 import { toast } from "sonner";
 import Image from "next/image";
 
@@ -21,6 +21,7 @@ import type {
 } from "@/modules/monthly-expenses/application/results/monthly-expenses-document-result";
 import {
   getMonthlyExpensesDocumentViaApi,
+  MonthlyExpensesAuthenticationError,
   saveMonthlyExpensesDocumentViaApi,
 } from "@/modules/monthly-expenses/infrastructure/api/monthly-expenses-api";
 import {
@@ -556,6 +557,15 @@ export default function ReceiptShareTargetPage() {
       toast.success("Comprobante guardado correctamente.");
       await router.push(`/compromisos?month=${encodeURIComponent(selectedMonth)}`);
     } catch (error) {
+      if (error instanceof MonthlyExpensesAuthenticationError) {
+        setSaveError("Tu sesion de Google vencio. Inicia sesion de nuevo para guardar.");
+        toast.warning("Tu sesion vencio. Te redirigimos para iniciar sesion nuevamente.");
+        await signOut({
+          callbackUrl: "/auth/signin?callbackUrl=%2Frecibir-comprobante",
+        });
+        return;
+      }
+
       setSaveError(getSafeMonthlyExpensesErrorMessage(error));
       toast.error("No pudimos guardar el comprobante.");
     } finally {

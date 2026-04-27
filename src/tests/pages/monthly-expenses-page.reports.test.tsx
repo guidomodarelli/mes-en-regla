@@ -783,6 +783,147 @@ registerMonthlyExpensesPageDefaultHooks({
     ).toBe(false);
   });
 
+  it("rejects the receipt save promise and triggers reauthentication on 401", async () => {
+    const user = userEvent.setup();
+    const deferredSaveResponse = createDeferredValue<{
+      json: () => Promise<{ error: string }>;
+      ok: boolean;
+      status: number;
+    }>();
+    const fetchMock = jest.fn().mockImplementation(async (input: RequestInfo | URL) => {
+      if (input === "/api/storage/monthly-expenses-receipts") {
+        return {
+          json: async () => ({
+            data: {
+              allReceiptsFolderId: "receipt-folder-id",
+              allReceiptsFolderViewUrl:
+                "https://drive.google.com/drive/folders/receipt-folder-id",
+              coveredPayments: 1,
+              fileId: "receipt-file-id",
+              fileName: "comprobante.pdf",
+              fileViewUrl:
+                "https://drive.google.com/file/d/receipt-file-id/view",
+              monthlyFolderId: "receipt-month-folder-id",
+              monthlyFolderViewUrl:
+                "https://drive.google.com/drive/folders/receipt-month-folder-id",
+              registeredAt: "2026-03-10T12:00:00.000Z",
+            },
+          }),
+          ok: true,
+        };
+      }
+
+      if (input === "/api/storage/monthly-expenses") {
+        return deferredSaveResponse.promise;
+      }
+
+      if (input === "/api/storage/monthly-expenses-report") {
+        return {
+          json: async () => ({
+            data: {
+              entries: [],
+              summary: {
+                activeLoanCount: 0,
+                lenderCount: 0,
+                remainingAmount: 0,
+                trackedLoanCount: 0,
+              },
+            },
+          }),
+          ok: true,
+        };
+      }
+
+      if (
+        typeof input === "string" &&
+        input.startsWith("/api/storage/monthly-expenses?")
+      ) {
+        return {
+          json: async () => ({
+            data: {
+              items: [],
+              month: "2026-03",
+            },
+          }),
+          ok: true,
+        };
+      }
+
+      throw new Error(`Unexpected fetch input: ${String(input)}`);
+    });
+
+    mockedUseSession.mockReturnValue({
+      data: {
+        expires: "2099-01-01T00:00:00.000Z",
+        user: {
+          email: "user@example.com",
+          name: "User",
+        },
+      },
+      status: "authenticated",
+      update: jest.fn(),
+    } as ReturnType<typeof useSession>);
+    global.fetch = fetchMock as typeof fetch;
+
+    renderWithProviders(
+      <MonthlyExpensesPage
+        {...basePageProps}
+        initialDocument={{
+          items: [
+            {
+              currency: "ARS",
+              description: "Internet",
+              id: "expense-1",
+              manualCoveredPayments: 0,
+              occurrencesPerMonth: 4,
+              subtotal: 100,
+              total: 400,
+            },
+          ],
+          month: "2026-03",
+        }}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Agregar nuevo registro de pago para Internet",
+      }),
+    );
+
+    const receiptFile = new File(["receipt-content"], "comprobante.pdf", {
+      type: "application/pdf",
+    });
+    await user.upload(screen.getByLabelText("Seleccionar comprobante"), receiptFile);
+    await user.click(screen.getByRole("button", { name: "Confirmar" }));
+
+    await waitFor(() => {
+      expect(mockedToast.promise).toHaveBeenCalledTimes(1);
+    });
+
+    const [receiptSavePromise] = mockedToast.promise.mock.lastCall as [
+      Promise<unknown>,
+    ];
+
+    deferredSaveResponse.resolve({
+      json: async () => ({
+        error: "Google authentication is required before saving monthly expenses.",
+      }),
+      ok: false,
+      status: 401,
+    });
+
+    await expect(receiptSavePromise).rejects.toThrow(
+      "Google authentication is required before saving monthly expenses.",
+    );
+
+    await waitFor(() => {
+      expect(mockedSignOut).toHaveBeenCalledWith({
+        callbackUrl: "/auth/signin?callbackUrl=%2Fcompromisos%3Fmonth%3D2026-03",
+      });
+    });
+  });
+
   it("blocks manual payment confirmation when requested coverage exceeds pending payments", async () => {
     const user = userEvent.setup();
     const fetchMock = createMonthlyExpensesFetchMock();
