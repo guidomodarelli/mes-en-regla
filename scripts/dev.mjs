@@ -5,26 +5,19 @@ import { fileURLToPath } from "node:url";
 const forwardedNextArguments = process.argv.slice(2);
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDirectory, "..");
-const binaryExtension = process.platform === "win32" ? ".cmd" : "";
-const nextBinary = path.join(
+const nextCliEntryPoint = path.join(
   projectRoot,
   "node_modules",
-  ".bin",
-  `next${binaryExtension}`,
+  "next",
+  "dist",
+  "bin",
+  "next",
 );
-const developmentEnvironment = {
-  ...process.env,
-  FORCE_COLOR: "1",
-};
-
-delete developmentEnvironment.NO_COLOR;
-delete developmentEnvironment.NODE_DISABLE_COLORS;
 
 function runCommand(command, args) {
   return new Promise((resolve, reject) => {
     const childProcess = spawn(command, args, {
       cwd: projectRoot,
-      env: developmentEnvironment,
       stdio: "inherit",
     });
 
@@ -41,7 +34,11 @@ function runCommand(command, args) {
 }
 
 async function startDevelopmentServer() {
-  const nextStatus = await runCommand(nextBinary, ["dev", ...forwardedNextArguments]);
+  const nextStatus = await runCommand(process.execPath, [
+    nextCliEntryPoint,
+    "dev",
+    ...forwardedNextArguments,
+  ]);
   process.exit(nextStatus);
 }
 
