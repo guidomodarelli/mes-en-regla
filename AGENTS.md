@@ -303,6 +303,12 @@ External API/SDK -> infrastructure DTO -> infrastructure mapper -> domain entity
 - If lint fails, fix the reported issues in the same work item and rerun lint until it passes.
 - Do not bypass lint failures with pending TODOs or deferred follow-ups.
 
+### SQL migrations push command (mandatory)
+
+- Use `npm run push-migrations` as the single entrypoint to push SQL migrations.
+- Do not run provider-specific migration push commands directly when this script exists.
+- Keep provider selection inside `scripts/push-migrations.mjs` so the workflow stays consistent across providers.
+
 ## 7. Implementation Checklist
 
 - Does the change preserve hexagonal boundaries?
