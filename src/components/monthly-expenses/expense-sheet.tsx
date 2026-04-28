@@ -254,6 +254,8 @@ function ExpenseSheetContent({
     formatCurrencyDisplay(draft.subtotal).trim() || "X";
   const totalFormulaSubtotal = `${currencyPrefix} ${totalFormulaSubtotalAmount}`;
   const totalFormulaOccurrences = draft.occurrencesPerMonth.trim() || "Y";
+  const isLoanToggleDisabled = mode === "edit";
+  const shouldShowLoanSection = isCreateMode || draft.isLoan;
   const form = useForm<ExpenseSheetFormValues>({
     values: getExpenseSheetFormValues(draft),
   });
@@ -549,27 +551,29 @@ function ExpenseSheetContent({
                 </div>
               ) : null}
 
-              <div className={styles.loanSection}>
-                <div className={styles.loanToggleRow}>
-                  <div className={styles.fieldControlWrapper}>
-                    <input
-                      checked={draft.isLoan}
-                      className={styles.loanToggle}
-                      id="expense-is-loan"
-                      onChange={(event) => onLoanToggle(event.target.checked)}
-                      type="checkbox"
-                    />
+              {shouldShowLoanSection ? (
+                <div className={styles.loanSection}>
+                  <div className={styles.loanToggleRow}>
+                    <div className={styles.fieldControlWrapper}>
+                      <input
+                        checked={draft.isLoan}
+                        className={styles.loanToggle}
+                        disabled={isLoanToggleDisabled}
+                        id="expense-is-loan"
+                        onChange={(event) => onLoanToggle(event.target.checked)}
+                        type="checkbox"
+                      />
+                    </div>
+                    <div className={styles.loanToggleLabelGroup}>
+                      <Label htmlFor="expense-is-loan">
+                        {getFieldLabel("Es deuda/préstamo", changedFields.has("isLoan"))}
+                      </Label>
+                      <LoanInfoPopover message={loanHelpMessage} />
+                    </div>
                   </div>
-                  <div className={styles.loanToggleLabelGroup}>
-                    <Label htmlFor="expense-is-loan">
-                      {getFieldLabel("Es deuda/préstamo", changedFields.has("isLoan"))}
-                    </Label>
-                    <LoanInfoPopover message={loanHelpMessage} />
-                  </div>
-                </div>
 
-                {draft.isLoan ? (
-                  <>
+                  {draft.isLoan ? (
+                    <>
                     <div className={styles.fieldGroup}>
                       <Label htmlFor="expense-loan-direction">
                         {getFieldLabel(
@@ -749,9 +753,10 @@ function ExpenseSheetContent({
                         </p>
                       </AlertDescription>
                     </Alert>
-                  </>
-                ) : null}
-              </div>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
 
               {isCreateMode ? (
                 <div className={styles.loanSection}>

@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -40,9 +41,11 @@ function createDraftRow(): MonthlyExpensesEditableRow {
 function renderExpenseSheet({
   draft = createDraftRow(),
   mode = "create",
+  onLoanToggle = jest.fn(),
 }: {
   draft?: MonthlyExpensesEditableRow;
   mode?: "create" | "edit";
+  onLoanToggle?: (checked: boolean) => void;
 }) {
   return render(
     <TooltipProvider>
@@ -57,7 +60,7 @@ function renderExpenseSheet({
         onAddLender={jest.fn()}
         onFieldChange={jest.fn()}
         onLenderSelect={jest.fn()}
-        onLoanToggle={jest.fn()}
+        onLoanToggle={onLoanToggle}
         onReceiptShareToggle={jest.fn()}
         onRequestClose={jest.fn()}
         onSave={jest.fn()}
@@ -126,5 +129,37 @@ describe("ExpenseSheet", () => {
     expect(screen.getByLabelText("Dirección del préstamo")).toHaveTextContent(
       "Me deben",
     );
+  });
+
+  it("hides the loan checkbox while editing a non-loan expense", () => {
+    renderExpenseSheet({
+      mode: "edit",
+    });
+
+    expect(screen.queryByLabelText("Es deuda/préstamo")).not.toBeInTheDocument();
+  });
+
+  it("does not toggle loan state from the loan checkbox while editing a loan expense", async () => {
+    const user = userEvent.setup();
+    const onLoanToggle = jest.fn();
+
+    renderExpenseSheet({
+      draft: {
+        ...createDraftRow(),
+        installmentCount: "12",
+        isLoan: true,
+        lenderId: "lender-1",
+        lenderName: "Banco Ciudad",
+        startMonth: "2026-01",
+      },
+      mode: "edit",
+      onLoanToggle,
+    });
+
+    const loanToggle = screen.getByLabelText("Es deuda/préstamo");
+    expect(loanToggle).toBeDisabled();
+    await user.click(loanToggle);
+
+    expect(onLoanToggle).not.toHaveBeenCalled();
   });
 });

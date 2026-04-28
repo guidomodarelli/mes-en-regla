@@ -10,6 +10,7 @@ export interface MonthlyExpenseReceiptRenameWarningResult {
 }
 
 export interface SaveMonthlyExpensesDocumentResult {
+  exchangeRateLoadError?: string | null;
   receiptRenameWarnings: MonthlyExpenseReceiptRenameWarningResult[];
   renamedReceiptFilesCount: number;
   storedDocument: StoredMonthlyExpensesDocumentResult;

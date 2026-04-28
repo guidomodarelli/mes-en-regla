@@ -1910,9 +1910,14 @@ export default function MonthlyExpensesPage({
         ...currentState,
         error: null,
         errorCode: null,
+        exchangeRateLoadError: saveResult.exchangeRateLoadError ?? null,
         isSubmitting: false,
         rows,
       }));
+
+      if (saveResult.exchangeRateLoadError) {
+        toast.info(saveResult.exchangeRateLoadError);
+      }
 
       if (saveResult.receiptRenameWarnings.length > 0) {
         toast.warning(
@@ -2002,6 +2007,9 @@ export default function MonthlyExpensesPage({
   const handleExpenseLoanToggle = (checked: boolean) => {
     updateExpenseSheetState((currentState) => {
       if (!currentState.draft) {
+        return currentState;
+      }
+      if (currentState.mode === "edit") {
         return currentState;
       }
 

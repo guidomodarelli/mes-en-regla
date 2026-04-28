@@ -1,6 +1,9 @@
 import type { MonthlyExpensesRepository } from "../../domain/repositories/monthly-expenses-repository";
 import type { MonthlyExpenseReceiptsRepository } from "../../domain/repositories/monthly-expense-receipts-repository";
 import { saveMonthlyExpensesDocument } from "./save-monthly-expenses-document";
+import {
+  MissingMonthlyExchangeRateError,
+} from "@/modules/exchange-rates/domain/errors/missing-monthly-exchange-rate-error";
 
 describe("saveMonthlyExpensesDocument", () => {
   it("delegates a validated monthly document with the snapshot to the repository", async () => {
@@ -74,6 +77,163 @@ describe("saveMonthlyExpensesDocument", () => {
         viewUrl: "https://drive.google.com/file/d/monthly-expenses-file-id/view",
       },
     });
+  });
+
+  it("saves monthly expenses without exchange rate snapshot when the target month has no historical rates", async () => {
+    const repository: MonthlyExpensesRepository = {
+      getByMonth: jest.fn(),
+      listAll: jest.fn(),
+      save: jest.fn().mockResolvedValue({
+        id: "monthly-expenses-file-id",
+        month: "2026-05",
+        name: "compromisos-mensuales-2026-mayo.json",
+        viewUrl: null,
+      }),
+    };
+
+    const result = await saveMonthlyExpensesDocument({
+      command: {
+        items: [
+          {
+            currency: "ARS",
+            description: "Expensas",
+            id: "expense-1",
+            occurrencesPerMonth: 1,
+            subtotal: 55032.07,
+          },
+        ],
+        month: "2026-05",
+      },
+      getExchangeRateSnapshot: jest
+        .fn()
+        .mockRejectedValue(new MissingMonthlyExchangeRateError("2026-05")),
+      repository,
+    });
+
+    expect(repository.save).toHaveBeenCalledWith({
+      items: [
+        {
+          currency: "ARS",
+          description: "Expensas",
+          id: "expense-1",
+          manualCoveredPayments: 0,
+          occurrencesPerMonth: 1,
+          paymentLink: null,
+          paymentRecords: [],
+          receipts: [],
+          subtotal: 55032.07,
+          total: 55032.07,
+        },
+      ],
+      month: "2026-05",
+    });
+    expect(result).toEqual({
+      exchangeRateLoadError:
+        "No pudimos cargar la cotización histórica del mes seleccionado. Igual podés seguir cargando y guardando compromisos.",
+      receiptRenameWarnings: [],
+      renamedReceiptFilesCount: 0,
+      storedDocument: {
+        id: "monthly-expenses-file-id",
+        month: "2026-05",
+        name: "compromisos-mensuales-2026-mayo.json",
+        viewUrl: null,
+      },
+    });
+  });
+
+  it("preserves the stored exchange rate snapshot when monthly lookup has no values", async () => {
+    const repository: MonthlyExpensesRepository = {
+      getByMonth: jest.fn().mockResolvedValue({
+        exchangeRateSnapshot: {
+          blueRate: 1190,
+          month: "2026-05",
+          officialRate: 1090,
+          solidarityRate: 1360,
+        },
+        items: [],
+        month: "2026-05",
+      }),
+      listAll: jest.fn(),
+      save: jest.fn().mockResolvedValue({
+        id: "monthly-expenses-file-id",
+        month: "2026-05",
+        name: "compromisos-mensuales-2026-mayo.json",
+        viewUrl: null,
+      }),
+    };
+
+    await saveMonthlyExpensesDocument({
+      command: {
+        items: [
+          {
+            currency: "ARS",
+            description: "Expensas",
+            id: "expense-1",
+            occurrencesPerMonth: 1,
+            subtotal: 55032.07,
+          },
+        ],
+        month: "2026-05",
+      },
+      getExchangeRateSnapshot: jest
+        .fn()
+        .mockRejectedValue(new MissingMonthlyExchangeRateError("2026-05")),
+      repository,
+    });
+
+    expect(repository.save).toHaveBeenCalledWith({
+      exchangeRateSnapshot: {
+        blueRate: 1190,
+        month: "2026-05",
+        officialRate: 1090,
+        solidarityRate: 1360,
+      },
+      items: [
+        {
+          currency: "ARS",
+          description: "Expensas",
+          id: "expense-1",
+          manualCoveredPayments: 0,
+          occurrencesPerMonth: 1,
+          paymentLink: null,
+          paymentRecords: [],
+          receipts: [],
+          subtotal: 55032.07,
+          total: 55032.07,
+        },
+      ],
+      month: "2026-05",
+    });
+  });
+
+  it("keeps throwing when exchange rate lookup fails for reasons other than missing monthly values", async () => {
+    const repository: MonthlyExpensesRepository = {
+      getByMonth: jest.fn(),
+      listAll: jest.fn(),
+      save: jest.fn(),
+    };
+
+    await expect(
+      saveMonthlyExpensesDocument({
+        command: {
+          items: [
+            {
+              currency: "ARS",
+              description: "Expensas",
+              id: "expense-1",
+              occurrencesPerMonth: 1,
+              subtotal: 55032.07,
+            },
+          ],
+          month: "2026-05",
+        },
+        getExchangeRateSnapshot: jest
+          .fn()
+          .mockRejectedValue(new Error("network timeout")),
+        repository,
+      }),
+    ).rejects.toThrow("network timeout");
+    expect(repository.save).not.toHaveBeenCalled();
   });
 
   it("renames receipt folder when an existing expense description changes", async () => {

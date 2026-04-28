@@ -232,6 +232,56 @@ describe("monthly-expenses-api client", () => {
     });
   });
 
+  it("returns non-blocking exchange rate warning from POST responses", async () => {
+    const fetchImplementation = jest.fn().mockResolvedValue({
+      json: async () => ({
+        data: {
+          exchangeRateLoadError:
+            "No pudimos cargar la cotización histórica del mes seleccionado. Igual podés seguir cargando y guardando compromisos.",
+          receiptRenameWarnings: [],
+          renamedReceiptFilesCount: 0,
+          storedDocument: {
+            id: "monthly-expenses-file-id",
+            month: "2026-05",
+            name: "compromisos-mensuales-2026-mayo.json",
+            viewUrl: null,
+          },
+        },
+      }),
+      ok: true,
+      status: 200,
+    });
+
+    await expect(
+      saveMonthlyExpensesDocumentViaApi(
+        {
+          items: [
+            {
+              currency: "ARS",
+              description: "Fibra",
+              id: "expense-1",
+              occurrencesPerMonth: 1,
+              subtotal: 45,
+            },
+          ],
+          month: "2026-05",
+        },
+        fetchImplementation,
+      ),
+    ).resolves.toEqual({
+      exchangeRateLoadError:
+        "No pudimos cargar la cotización histórica del mes seleccionado. Igual podés seguir cargando y guardando compromisos.",
+      receiptRenameWarnings: [],
+      renamedReceiptFilesCount: 0,
+      storedDocument: {
+        id: "monthly-expenses-file-id",
+        month: "2026-05",
+        name: "compromisos-mensuales-2026-mayo.json",
+        viewUrl: null,
+      },
+    });
+  });
+
   it("throws MonthlyExpensesAuthenticationError when POST responds with 401", async () => {
     const fetchImplementation = jest.fn().mockResolvedValue({
       json: async () => ({

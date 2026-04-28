@@ -267,6 +267,63 @@ registerMonthlyExpensesPageDefaultHooks({
         "El compromiso se guardó, pero 1 comprobante(s) no se pudieron renombrar.",
       );
     });
+  }, 10000);
+
+  it("shows info toast when save returns exchange rate fallback warning", async () => {
+    const user = userEvent.setup();
+    const fetchMock = createMonthlyExpensesFetchMock({
+      saveResponse: {
+        body: {
+          data: {
+            exchangeRateLoadError:
+              "No pudimos cargar la cotización histórica del mes seleccionado. Igual podés seguir cargando y guardando compromisos.",
+            receiptRenameWarnings: [],
+            renamedReceiptFilesCount: 0,
+            storedDocument: {
+              id: "monthly-expenses-file-id",
+              month: "2026-05",
+              name: "compromisos-mensuales-2026-mayo.json",
+              viewUrl: null,
+            },
+          },
+        },
+        status: 200,
+      },
+    });
+
+    mockedUseSession.mockReturnValue({
+      data: {
+        expires: "2099-01-01T00:00:00.000Z",
+        user: {
+          email: "gus@example.com",
+          name: "Gus",
+        },
+      },
+      status: "authenticated",
+      update: jest.fn(),
+    } as ReturnType<typeof useSession>);
+    global.fetch = fetchMock as typeof fetch;
+
+    renderWithProviders(
+      <MonthlyExpensesPage
+        {...basePageProps}
+        initialDocument={{
+          items: [],
+          month: "2026-05",
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Agregar compromiso" }));
+    await user.type(screen.getByLabelText("Descripción"), "Fibra");
+    await user.type(screen.getByLabelText("Subtotal"), "15000");
+    await user.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() => {
+      expect(mockedToast.info).toHaveBeenCalledWith(
+        "No pudimos cargar la cotización histórica del mes seleccionado. Igual podés seguir cargando y guardando compromisos.",
+      );
+    });
   });
 
   it("shows the occurrences input only for multiple monthly payments", async () => {
@@ -2168,7 +2225,48 @@ registerMonthlyExpensesPageDefaultHooks({
     await user.click(screen.getByLabelText("Es deuda/préstamo"));
 
     expect(screen.queryByText("Seleccioná un prestamista")).not.toBeInTheDocument();
-  });
+  }, 10000);
+
+  it("hides the debt card in edit mode when the expense is not a loan", async () => {
+    const user = userEvent.setup();
+
+    mockedUseSession.mockReturnValue({
+      data: {
+        expires: "2099-01-01T00:00:00.000Z",
+        user: {
+          email: "gus@example.com",
+          name: "Gus",
+        },
+      },
+      status: "authenticated",
+      update: jest.fn(),
+    } as ReturnType<typeof useSession>);
+
+    renderWithProviders(
+      <MonthlyExpensesPage
+        {...basePageProps}
+        initialDocument={{
+          items: [
+            {
+              currency: "ARS",
+              description: "Agua",
+              id: "expense-1",
+              occurrencesPerMonth: 1,
+              subtotal: 10774.53,
+              total: 10774.53,
+            },
+          ],
+          month: "2026-03",
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Abrir acciones para Agua" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Editar" }));
+
+    expect(screen.queryByLabelText("Es deuda/préstamo")).not.toBeInTheDocument();
+    expect(screen.queryByText("Seleccioná un prestamista")).not.toBeInTheDocument();
+  }, 10000);
 
   it("shows the debt info tooltip and closes it from the close button, outside click, or Escape", async () => {
     const user = userEvent.setup();
@@ -2672,25 +2770,13 @@ registerMonthlyExpensesPageDefaultHooks({
       <MonthlyExpensesPage
         {...basePageProps}
         initialDocument={{
-          items: [
-            {
-              currency: "ARS",
-              description: "Prestamo tarjeta",
-              id: "expense-1",
-              occurrencesPerMonth: 1,
-              subtotal: 50000,
-              total: 50000,
-            },
-          ],
+          items: [],
           month: "2026-03",
         }}
       />,
     );
 
-    await user.click(
-      screen.getByRole("button", { name: "Abrir acciones para Prestamo tarjeta" }),
-    );
-    await user.click(await screen.findByRole("menuitem", { name: "Editar" }));
+    await user.click(screen.getByRole("button", { name: "Agregar compromiso" }));
     await user.click(screen.getByLabelText("Es deuda/préstamo"));
 
     expect(screen.queryByText("Completá la fecha de inicio.")).not.toBeInTheDocument();
@@ -2849,27 +2935,17 @@ registerMonthlyExpensesPageDefaultHooks({
           ],
         }}
         initialDocument={{
-          items: [
-            {
-              currency: "ARS",
-              description: "Prestamo tarjeta",
-              id: "expense-1",
-              occurrencesPerMonth: 1,
-              subtotal: 50000,
-              total: 50000,
-            },
-          ],
+          items: [],
           month: "2026-03",
         }}
       />,
     );
 
-    await user.click(
-      screen.getByRole("button", { name: "Abrir acciones para Prestamo tarjeta" }),
-    );
-    await user.click(await screen.findByRole("menuitem", { name: "Editar" }));
+    await user.click(screen.getByRole("button", { name: "Agregar compromiso" }));
     await user.click(screen.getByLabelText("Es deuda/préstamo"));
     await user.type(screen.getByLabelText("Cantidad total de cuotas"), "7");
+    await user.type(screen.getByLabelText("Descripción"), "Prestamo tarjeta");
+    await user.type(screen.getByLabelText("Subtotal"), "50000");
     fireEvent.change(screen.getByLabelText("Inicio de la deuda"), {
       target: { value: "2026-01" },
     });
@@ -2892,7 +2968,7 @@ registerMonthlyExpensesPageDefaultHooks({
           {
             currency: "ARS",
             description: "Prestamo tarjeta",
-            id: "expense-1",
+            id: expect.any(String),
             loan: {
               installmentCount: 7,
               lenderId: "lender-1",
@@ -2907,7 +2983,7 @@ registerMonthlyExpensesPageDefaultHooks({
         month: "2026-03",
       });
     });
-  });
+  }, 10000);
 
   it("saves receivable loan direction from the expense sheet", async () => {
     const user = userEvent.setup();
@@ -2939,26 +3015,16 @@ registerMonthlyExpensesPageDefaultHooks({
           ],
         }}
         initialDocument={{
-          items: [
-            {
-              currency: "ARS",
-              description: "Prestamo a proveedor",
-              id: "expense-1",
-              occurrencesPerMonth: 1,
-              subtotal: 10000,
-              total: 10000,
-            },
-          ],
+          items: [],
           month: "2026-03",
         }}
       />,
     );
 
-    await user.click(
-      screen.getByRole("button", { name: "Abrir acciones para Prestamo a proveedor" }),
-    );
-    await user.click(await screen.findByRole("menuitem", { name: "Editar" }));
+    await user.click(screen.getByRole("button", { name: "Agregar compromiso" }));
     await user.click(screen.getByLabelText("Es deuda/préstamo"));
+    await user.type(screen.getByLabelText("Descripción"), "Prestamo a proveedor");
+    await user.type(screen.getByLabelText("Subtotal"), "10000");
     await user.click(screen.getByRole("combobox", { name: "Dirección del préstamo" }));
     await user.click(screen.getByRole("option", { name: "Me deben" }));
     await user.type(screen.getByLabelText("Cantidad total de cuotas"), "3");
@@ -2970,15 +3036,20 @@ registerMonthlyExpensesPageDefaultHooks({
     await user.click(screen.getByRole("button", { name: "Guardar" }));
 
     await waitFor(() => {
-      expect(getMonthlyExpensesSavePayload(fetchMock).items[0]?.loan).toEqual({
-        direction: "receivable",
-        installmentCount: 3,
-        lenderId: "lender-1",
-        lenderName: "Proveedor",
-        startMonth: "2026-01",
-      });
+      expect(getMonthlyExpensesSavePayload(fetchMock).items[0]).toEqual(
+        expect.objectContaining({
+          description: "Prestamo a proveedor",
+          loan: {
+            direction: "receivable",
+            installmentCount: 3,
+            lenderId: "lender-1",
+            lenderName: "Proveedor",
+            startMonth: "2026-01",
+          },
+        }),
+      );
     });
-  });
+  }, 10000);
 
   it("keeps installment validation as a positive integer", async () => {
     const user = userEvent.setup();
@@ -3014,10 +3085,7 @@ registerMonthlyExpensesPageDefaultHooks({
       />,
     );
 
-    await user.click(
-      screen.getByRole("button", { name: "Abrir acciones para Prestamo tarjeta" }),
-    );
-    await user.click(await screen.findByRole("menuitem", { name: "Editar" }));
+    await user.click(screen.getByRole("button", { name: "Agregar compromiso" }));
     await user.click(screen.getByLabelText("Es deuda/préstamo"));
     await user.type(screen.getByLabelText("Cantidad total de cuotas"), "0");
     fireEvent.change(screen.getByLabelText("Inicio de la deuda"), {
@@ -3037,7 +3105,7 @@ registerMonthlyExpensesPageDefaultHooks({
       "aria-invalid",
       "true",
     );
-  });
+  }, 10000);
 
   it("uses native month input with a 2000 to 2100 range for debt start month", async () => {
     const user = userEvent.setup();
@@ -3073,10 +3141,7 @@ registerMonthlyExpensesPageDefaultHooks({
       />,
     );
 
-    await user.click(
-      screen.getByRole("button", { name: "Abrir acciones para Prestamo tarjeta" }),
-    );
-    await user.click(await screen.findByRole("menuitem", { name: "Editar" }));
+    await user.click(screen.getByRole("button", { name: "Agregar compromiso" }));
     await user.click(screen.getByLabelText("Es deuda/préstamo"));
 
     const startMonthInput = screen.getByLabelText("Inicio de la deuda");
@@ -3210,10 +3275,7 @@ registerMonthlyExpensesPageDefaultHooks({
       />,
     );
 
-    await user.click(
-      screen.getByRole("button", { name: "Abrir acciones para Prestamo personal" }),
-    );
-    await user.click(await screen.findByRole("menuitem", { name: "Editar" }));
+    await user.click(screen.getByRole("button", { name: "Agregar compromiso" }));
     await user.click(screen.getByLabelText("Es deuda/préstamo"));
     await user.click(screen.getByRole("button", { name: "Seleccioná un prestamista" }));
 

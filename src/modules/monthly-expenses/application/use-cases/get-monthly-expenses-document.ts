@@ -13,6 +13,12 @@ import {
   type MonthlyExpensesDocumentResult,
 } from "../results/monthly-expenses-document-result";
 import type { MonthlyExchangeRateSnapshot } from "@/modules/exchange-rates/domain/entities/monthly-exchange-rate-snapshot";
+import {
+  MissingMonthlyExchangeRateError,
+} from "@/modules/exchange-rates/domain/errors/missing-monthly-exchange-rate-error";
+
+const MONTHLY_EXCHANGE_RATE_FALLBACK_MESSAGE =
+  "No pudimos cargar la cotización histórica del mes seleccionado. Igual podés seguir cargando y guardando compromisos.";
 
 interface GetMonthlyExpensesDocumentDependencies {
   getExchangeRateSnapshot: (
@@ -210,13 +216,17 @@ export async function getMonthlyExpensesDocument({
         receiptsRepository,
       }),
     );
-  } catch {
+  } catch (error) {
     const fallbackDocument =
       storedDocument ?? createEmptyMonthlyExpensesDocument(query.month);
+    const exchangeRateLoadError =
+      error instanceof MissingMonthlyExchangeRateError
+        ? MONTHLY_EXCHANGE_RATE_FALLBACK_MESSAGE
+        : "No pudimos cargar la cotización histórica del mes seleccionado.";
 
     return toMonthlyExpensesDocumentResult(
       fallbackDocument,
-      "No pudimos cargar la cotización histórica del mes seleccionado.",
+      exchangeRateLoadError,
       await verifyReceiptStatusesByFileId({
         document: fallbackDocument,
         includeDriveStatuses,

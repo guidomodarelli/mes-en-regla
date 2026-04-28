@@ -17,6 +17,12 @@ import {
   getReceiptFileNameDatePrefix,
 } from "./monthly-expense-receipt-file-name";
 import type { MonthlyExchangeRateSnapshot } from "@/modules/exchange-rates/domain/entities/monthly-exchange-rate-snapshot";
+import {
+  MissingMonthlyExchangeRateError,
+} from "@/modules/exchange-rates/domain/errors/missing-monthly-exchange-rate-error";
+
+const MONTHLY_EXCHANGE_RATE_FALLBACK_MESSAGE =
+  "No pudimos cargar la cotización histórica del mes seleccionado. Igual podés seguir cargando y guardando compromisos.";
 
 interface SaveMonthlyExpensesDocumentDependencies {
   command: SaveMonthlyExpensesCommand;
@@ -231,22 +237,38 @@ export async function saveMonthlyExpensesDocument({
     command,
     "Saving monthly expenses",
   );
-  const exchangeRateSnapshot = await getExchangeRateSnapshot(
-    validatedBaseDocument.month,
-  );
-  const currentDocument = receiptsRepository
-    ? await repository.getByMonth(validatedBaseDocument.month)
-    : null;
+  let exchangeRateSnapshot: MonthlyExchangeRateSnapshot | null = null;
+  let exchangeRateLoadError: string | null = null;
+
+  try {
+    exchangeRateSnapshot = await getExchangeRateSnapshot(
+      validatedBaseDocument.month,
+    );
+  } catch (error) {
+    if (!(error instanceof MissingMonthlyExchangeRateError)) {
+      throw error;
+    }
+
+    exchangeRateLoadError = MONTHLY_EXCHANGE_RATE_FALLBACK_MESSAGE;
+  }
+  const currentDocument = await repository.getByMonth(validatedBaseDocument.month);
+  const resolvedExchangeRateSnapshot =
+    exchangeRateSnapshot ?? currentDocument?.exchangeRateSnapshot ?? null;
+  const validatedDocumentInput = {
+    ...toMonthlyExpensesDocumentInput(validatedBaseDocument),
+    ...(resolvedExchangeRateSnapshot
+      ? {
+          exchangeRateSnapshot: {
+            blueRate: resolvedExchangeRateSnapshot.blueRate,
+            month: resolvedExchangeRateSnapshot.month,
+            officialRate: resolvedExchangeRateSnapshot.officialRate,
+            solidarityRate: resolvedExchangeRateSnapshot.solidarityRate,
+          },
+        }
+      : {}),
+  };
   const validatedDocument: MonthlyExpensesDocument = createMonthlyExpensesDocument(
-    {
-      ...toMonthlyExpensesDocumentInput(validatedBaseDocument),
-      exchangeRateSnapshot: {
-        blueRate: exchangeRateSnapshot.blueRate,
-        month: exchangeRateSnapshot.month,
-        officialRate: exchangeRateSnapshot.officialRate,
-        solidarityRate: exchangeRateSnapshot.solidarityRate,
-      },
-    },
+    validatedDocumentInput,
     "Saving monthly expenses",
   );
 
@@ -275,6 +297,7 @@ export async function saveMonthlyExpensesDocument({
   }
 
   return {
+    ...(exchangeRateLoadError ? { exchangeRateLoadError } : {}),
     receiptRenameWarnings,
     renamedReceiptFilesCount,
     storedDocument: toStoredMonthlyExpensesDocumentResult(

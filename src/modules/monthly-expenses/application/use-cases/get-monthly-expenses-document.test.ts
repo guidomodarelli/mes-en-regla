@@ -1,6 +1,9 @@
 import type { MonthlyExpensesRepository } from "../../domain/repositories/monthly-expenses-repository";
 import type { MonthlyExpenseReceiptsRepository } from "../../domain/repositories/monthly-expense-receipts-repository";
 import { getMonthlyExpensesDocument } from "./get-monthly-expenses-document";
+import {
+  MissingMonthlyExchangeRateError,
+} from "@/modules/exchange-rates/domain/errors/missing-monthly-exchange-rate-error";
 
 const getExchangeRateSnapshot = jest.fn().mockResolvedValue({
   blueRate: 1290,
@@ -495,6 +498,32 @@ describe("getMonthlyExpensesDocument", () => {
     expect(receiptsRepository.verifyFolders).toHaveBeenCalledWith({
       allReceiptsFolderId: "receipt-folder-id",
       monthlyFolderId: "receipt-month-folder-id",
+    });
+  });
+
+  it("returns a non-blocking exchange rate warning when the selected month has no historical rates", async () => {
+    const repository: MonthlyExpensesRepository = {
+      getByMonth: jest.fn().mockResolvedValue(null),
+      listAll: jest.fn(),
+      save: jest.fn(),
+    };
+
+    const result = await getMonthlyExpensesDocument({
+      getExchangeRateSnapshot: jest
+        .fn()
+        .mockRejectedValue(new MissingMonthlyExchangeRateError("2026-05")),
+      query: {
+        month: "2026-05",
+      },
+      repository,
+    });
+
+    expect(result).toEqual({
+      exchangeRateLoadError:
+        "No pudimos cargar la cotización histórica del mes seleccionado. Igual podés seguir cargando y guardando compromisos.",
+      exchangeRateSnapshot: null,
+      items: [],
+      month: "2026-05",
     });
   });
 });

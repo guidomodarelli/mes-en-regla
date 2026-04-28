@@ -2,6 +2,9 @@ import type {
   AmbitoDollarHistoryDto,
   AmbitoDollarRateDto,
 } from "./dto/ambito-dollar-rate.dto";
+import {
+  MissingMonthlyExchangeRateError,
+} from "../../domain/errors/missing-monthly-exchange-rate-error";
 
 function normalizeAmbitoDate(dateValue: string): string {
   const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dateValue.trim());
@@ -93,9 +96,7 @@ export function mapAmbitoDollarHistoryDtoToMonthlyRate(
   });
 
   if (availableRates.length === 0) {
-    throw new Error(
-      `Cannot map an Ambito historical dollar payload without values for month "${month}".`,
-    );
+    throw new MissingMonthlyExchangeRateError(month);
   }
 
   availableRates.sort((left, right) => {

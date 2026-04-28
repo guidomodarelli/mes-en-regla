@@ -223,6 +223,7 @@ const monthlyExpensesSaveWarningSchema = z.object({
 
 const monthlyExpensesSaveEnvelopeSchema = z.object({
   data: z.object({
+    exchangeRateLoadError: z.string().nullable().optional(),
     receiptRenameWarnings: z.array(monthlyExpensesSaveWarningSchema),
     renamedReceiptFilesCount: z.number().int().nonnegative(),
     storedDocument: z.object({
@@ -324,6 +325,7 @@ export class MonthlyExpensesAuthenticationError extends MonthlyExpensesApiError 
 }
 
 export interface SaveMonthlyExpensesDocumentApiResult {
+  exchangeRateLoadError?: string | null;
   receiptRenameWarnings: Array<{
     fileId: string;
     nextFileName: string;
@@ -377,6 +379,7 @@ export async function saveMonthlyExpensesDocumentViaApi(
 
   if (response.status === 204) {
     return {
+      exchangeRateLoadError: null,
       receiptRenameWarnings: [],
       renamedReceiptFilesCount: 0,
       storedDocument: {

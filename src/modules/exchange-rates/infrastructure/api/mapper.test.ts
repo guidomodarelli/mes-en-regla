@@ -3,6 +3,9 @@ import {
   mapAmbitoDollarRateDtoToRate,
   sanitizePrice,
 } from "./mapper";
+import {
+  MissingMonthlyExchangeRateError,
+} from "../../domain/errors/missing-monthly-exchange-rate-error";
 
 describe("exchange-rates mapper", () => {
   it("sanitizes localized price strings from Ambito", () => {
@@ -56,13 +59,12 @@ describe("exchange-rates mapper", () => {
   });
 
   it("rejects historical payloads without monthly values", () => {
-    expect(() =>
-      mapAmbitoDollarHistoryDtoToMonthlyRate(
-        [["Fecha", "Compra", "Venta"]],
-        "2026-03",
-      ),
-    ).toThrow(
-      'Cannot map an Ambito historical dollar payload without values for month "2026-03".',
-    );
+    expect(
+      () =>
+        mapAmbitoDollarHistoryDtoToMonthlyRate(
+          [["Fecha", "Compra", "Venta"]],
+          "2026-03",
+        ),
+    ).toThrow(MissingMonthlyExchangeRateError);
   });
 });
