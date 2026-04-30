@@ -312,6 +312,16 @@ External API/SDK -> infrastructure DTO -> infrastructure mapper -> domain entity
 - If lint fails, fix the reported issues in the same work item and rerun lint until it passes.
 - Do not bypass lint failures with pending TODOs or deferred follow-ups.
 
+### Quality gates (mandatory)
+
+- Every work item must run all three checks before completion:
+  - `npm run lint`
+  - `npm run typecheck`
+  - `npm run test`
+- A task is blocked from completion if any of these commands exits with a non-zero status code.
+- If any check fails, fix the issues in the same work item and rerun the failed command(s) until all three are green.
+- Do not defer these checks to follow-up tasks.
+
 ### SQL migrations push command (mandatory)
 
 - Use `npm run push-migrations` as the single entrypoint to push SQL migrations.

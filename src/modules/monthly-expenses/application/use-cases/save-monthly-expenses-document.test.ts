@@ -51,6 +51,7 @@ describe("saveMonthlyExpensesDocument", () => {
         officialRate: 1200,
         solidarityRate: 1476,
       },
+      hasReplicatedFromPreviousMonth: false,
       items: [
         {
           currency: "ARS",
@@ -111,6 +112,7 @@ describe("saveMonthlyExpensesDocument", () => {
     });
 
     expect(repository.save).toHaveBeenCalledWith({
+      hasReplicatedFromPreviousMonth: false,
       items: [
         {
           currency: "ARS",
@@ -188,6 +190,7 @@ describe("saveMonthlyExpensesDocument", () => {
         officialRate: 1090,
         solidarityRate: 1360,
       },
+      hasReplicatedFromPreviousMonth: false,
       items: [
         {
           currency: "ARS",

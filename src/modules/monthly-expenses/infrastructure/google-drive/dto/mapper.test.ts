@@ -121,6 +121,7 @@ describe("monthlyExpensesGoogleDriveMapper", () => {
     );
 
     expect(result).toEqual({
+      hasReplicatedFromPreviousMonth: false,
       items: [
         {
           currency: "USD",
@@ -163,6 +164,7 @@ describe("monthlyExpensesGoogleDriveMapper", () => {
     );
 
     expect(result).toEqual({
+      hasReplicatedFromPreviousMonth: false,
       items: [
         {
           currency: "ARS",

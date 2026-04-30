@@ -4153,7 +4153,7 @@ export function MonthlyExpensesTable({
           onOpenChange={onCopyFromMonthDialogOpenChange}
           open={replicateFromPreviousMonthDialogOpen}
         >
-          <DialogContent size="sm">
+          <DialogContent>
             <DialogHeader>
               <DialogTitle>Seleccioná los gastos/deudas a replicar</DialogTitle>
               <DialogDescription>

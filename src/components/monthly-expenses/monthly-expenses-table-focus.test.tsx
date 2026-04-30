@@ -62,6 +62,10 @@ function renderMonthlyExpensesTable(rows: MonthlyExpensesEditableRow[]) {
         onAddExpense={jest.fn()}
         onAddLender={jest.fn()}
         onCopyFromMonth={jest.fn()}
+        onCopyFromMonthDialogOpenChange={jest.fn()}
+        onConfirmCopyFromMonth={jest.fn()}
+        onToggleAllReplicableOptions={jest.fn()}
+        onToggleReplicableOption={jest.fn()}
         onDeleteAllReceiptsFolderReference={jest.fn()}
         onDeleteExpense={jest.fn()}
         onDeleteExpenseReceiptShare={jest.fn()}
@@ -89,7 +93,10 @@ function renderMonthlyExpensesTable(rows: MonthlyExpensesEditableRow[]) {
         onUpdatePaymentLink={jest.fn()}
         onUpdateReceiptShareStatus={jest.fn()}
         pendingMonth={null}
+        replicateFromPreviousMonthDialogOpen={false}
+        replicateFromPreviousMonthOptions={[]}
         rows={rows}
+        selectedReplicableOptionIds={[]}
         sheetMode="create"
         showCopyFromControls={false}
         showUnsavedChangesDialog={false}

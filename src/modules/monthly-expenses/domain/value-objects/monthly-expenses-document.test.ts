@@ -29,6 +29,7 @@ describe("monthlyExpensesDocument", () => {
     );
 
     expect(result).toEqual({
+      hasReplicatedFromPreviousMonth: false,
       items: [
         {
           currency: "ARS",

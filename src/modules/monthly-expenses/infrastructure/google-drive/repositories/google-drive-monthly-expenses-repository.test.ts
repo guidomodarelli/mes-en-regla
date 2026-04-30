@@ -215,6 +215,7 @@ describe("GoogleDriveMonthlyExpensesRepository", () => {
     );
     expect(result).toEqual([
       {
+        hasReplicatedFromPreviousMonth: false,
         items: [],
         month: "2026-03",
       },
